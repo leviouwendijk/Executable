@@ -1,0 +1,42 @@
+{
+  "originHash" : "224c80e32dc3c1c89cd5ac182f5a16ecb79dc75f282a0884ef0ab3c12f668c3e",
+  "pins" : [
+    {
+      "identity" : "extensions",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Extensions.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "3310d463b1bc509cccd8e75f0acc221e153f5dff"
+      }
+    },
+    {
+      "identity" : "interfaces",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Interfaces.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "bd39de6d52da6835ac97d78b2ee674d0101c39a6"
+      }
+    },
+    {
+      "identity" : "plate",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/plate.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "1a04bbb14ac032ebce0ae3bb2f71aa4d9c10712a"
+      }
+    },
+    {
+      "identity" : "structures",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Structures.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "ee6c6836b897caff5a2f9111351976264a043076"
+      }
+    }
+  ],
+  "version" : 3
+}
