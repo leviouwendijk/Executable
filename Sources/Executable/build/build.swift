@@ -43,62 +43,62 @@ public enum Build {
         public let buildDirComponent: String
     }
 
-    // @discardableResult
-    // private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
-    //     var opt = Shell.Options()
-    //     opt.cwd = dir
+    @discardableResult
+    private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
+        var opt = Shell.Options()
+        opt.cwd = dir
 
-    //     // mirror sbm’s streamed output with light paint
-    //     let colorables: [ColorableString] = [
-    //         .init(selection: ["production", "debugging"], colors: [.bold]),
-    //         .init(selection: ["error"], colors: [.red]),
-    //         .init(selection: ["warning"], colors: [.yellow]),
-    //         .init(selection: ["Build complete!"], colors: [.green])
-    //     ]
+        // mirror sbm’s streamed output with light paint
+        let colorables: [ColorableString] = [
+            .init(selection: ["production", "debugging"], colors: [.bold]),
+            .init(selection: ["error"], colors: [.red]),
+            .init(selection: ["warning"], colors: [.yellow]),
+            .init(selection: ["Build complete!"], colors: [.green])
+        ]
 
-    //     // NEW: USING LINESTREAMER INVOCATION
-    //     let painter: @Sendable (String) -> String = { $0.paint(colorables) }
+        // NEW: USING LINESTREAMER INVOCATION
+        let painter: @Sendable (String) -> String = { $0.paint(colorables) }
 
-    //     let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
-    //     let errStreamer = LineStreamer(handle: .standardError,  colorize: true, paint: painter)
+        let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
+        let errStreamer = LineStreamer(handle: .standardError,  colorize: true, paint: painter)
 
-    //     opt.teeToStdout = false
-    //     opt.teeToStderr = false
+        opt.teeToStdout = false
+        opt.teeToStderr = false
 
-    //     opt.onStdoutChunk = { chunk in
-    //         Task { await outStreamer.ingest(chunk) }
-    //     }
-    //     opt.onStderrChunk = { chunk in
-    //         Task { await errStreamer.ingest(chunk) }
-    //     }
+        opt.onStdoutChunk = { chunk in
+            Task { await outStreamer.ingest(chunk) }
+        }
+        opt.onStderrChunk = { chunk in
+            Task { await errStreamer.ingest(chunk) }
+        }
 
-    //     let res = try await Shell(.zsh).run(
-    //         "/usr/bin/env",
-    //         ["swift"] + command,
-    //         options: opt
-    //     )
+        let res = try await Shell(.zsh).run(
+            "/usr/bin/env",
+            ["swift"] + command,
+            options: opt
+        )
 
-    //     await outStreamer.flush()
-    //     await errStreamer.flush()
+        await outStreamer.flush()
+        await errStreamer.flush()
 
-    //     let code = res.exitCode ?? 0
-    //     if code != 0 {
-    //         let out = String(data: res.stdout, encoding: .utf8) ?? ""
-    //         let err = res.stderrText()
-    //         throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
-    //     }
+        let code = res.exitCode ?? 0
+        if code != 0 {
+            let out = String(data: res.stdout, encoding: .utf8) ?? ""
+            let err = res.stderrText()
+            throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
+        }
 
-    //     let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
+        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
 
-    //     return BuildResult(
-    //         exitCode: Int32(code),
-    //         stdout: res.stdout,
-    //         stderr: res.stderr,
-    //         mode: mode,
-    //         buildDirComponent: (mode == .debug ? "debug" : "release")
-    //     )
-    //     // END OF NEW LINESTREAMER INVOCATION
-    // }
+        return BuildResult(
+            exitCode: Int32(code),
+            stdout: res.stdout,
+            stderr: res.stderr,
+            mode: mode,
+            buildDirComponent: (mode == .debug ? "debug" : "release")
+        )
+        // END OF NEW LINESTREAMER INVOCATION
+    }
 
     // // COLORING, BUT NO STREAM
     // @discardableResult
@@ -151,54 +151,54 @@ public enum Build {
     //     }
     // }
 
-    @discardableResult
-    private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
-        var opt = Shell.Options()
-        opt.cwd = dir
+    // @discardableResult
+    // private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
+    //     var opt = Shell.Options()
+    //     opt.cwd = dir
 
-        // mirror sbm’s streamed output with light paint
-        let colorables: [ColorableString] = [
-            .init(selection: ["production", "debugging"], colors: [.bold]),
-            .init(selection: ["error"], colors: [.red]),
-            .init(selection: ["warning"], colors: [.yellow]),
-            .init(selection: ["Build complete!"], colors: [.green])
-        ]
+    //     // mirror sbm’s streamed output with light paint
+    //     let colorables: [ColorableString] = [
+    //         .init(selection: ["production", "debugging"], colors: [.bold]),
+    //         .init(selection: ["error"], colors: [.red]),
+    //         .init(selection: ["warning"], colors: [.yellow]),
+    //         .init(selection: ["Build complete!"], colors: [.green])
+    //     ]
 
-        let painter: @Sendable (String) -> String = { $0.paint(colorables) }
+    //     let painter: @Sendable (String) -> String = { $0.paint(colorables) }
 
-        let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
-        let errStreamer = LineStreamer(handle: .standardError,  colorize: true, paint: painter)
+    //     let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
+    //     let errStreamer = LineStreamer(handle: .standardError,  colorize: true, paint: painter)
 
-        opt.teeToStdout = true
-        opt.teeToStderr = true
+    //     opt.teeToStdout = true
+    //     opt.teeToStderr = true
 
-        opt.onStdoutChunk = nil
-        opt.onStderrChunk = nil
+    //     opt.onStdoutChunk = nil
+    //     opt.onStderrChunk = nil
 
-        let res = try await Shell(.zsh).run(
-            "/usr/bin/env",
-            ["swift"] + command,
-            options: opt
-        )
+    //     let res = try await Shell(.zsh).run(
+    //         "/usr/bin/env",
+    //         ["swift"] + command,
+    //         options: opt
+    //     )
 
-        await outStreamer.flush()
-        await errStreamer.flush()
+    //     await outStreamer.flush()
+    //     await errStreamer.flush()
 
-        let code = res.exitCode ?? 0
-        if code != 0 {
-            let out = String(data: res.stdout, encoding: .utf8) ?? ""
-            let err = res.stderrText()
-            throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
-        }
+    //     let code = res.exitCode ?? 0
+    //     if code != 0 {
+    //         let out = String(data: res.stdout, encoding: .utf8) ?? ""
+    //         let err = res.stderrText()
+    //         throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
+    //     }
 
-        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
+    //     let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
 
-        return BuildResult(
-            exitCode: Int32(code),
-            stdout: res.stdout,
-            stderr: res.stderr,
-            mode: mode,
-            buildDirComponent: (mode == .debug ? "debug" : "release")
-        )
-    }
+    //     return BuildResult(
+    //         exitCode: Int32(code),
+    //         stdout: res.stdout,
+    //         stderr: res.stderr,
+    //         mode: mode,
+    //         buildDirComponent: (mode == .debug ? "debug" : "release")
+    //     )
+    // }
 }
