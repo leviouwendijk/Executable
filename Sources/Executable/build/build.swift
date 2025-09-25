@@ -72,9 +72,15 @@ public enum Build {
             Task.detached(priority: .userInitiated) { await errStreamer.ingest(chunk) }
         }
 
-        let res = try await Shell(.zsh).run(
-            "/usr/bin/env",
-            ["swift"] + command,
+        // let res = try await Shell(.zsh).run(
+        //     "/usr/bin/env",
+        //     ["swift"] + command,
+        //     options: opt
+        // )
+
+        let res = try await Shell(.path("/usr/bin/script")).run(
+            "/usr/bin/script",
+            [ "-q", "/dev/null", "/usr/bin/env", "swift" ] + command,
             options: opt
         )
 
