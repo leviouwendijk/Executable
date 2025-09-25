@@ -35,8 +35,6 @@ public enum Build {
         print("\nClean successful!".ansi(.green))
     }
 
-    // MARK: - Internals
-
     public struct BuildResult: Sendable {
         public let exitCode: Int32
         public let stdout: Data
@@ -58,39 +56,84 @@ public enum Build {
             .init(selection: ["Build complete!"], colors: [.green])
         ]
 
+        // NEW: USING LINESTREAMER INVOCATION
+        let painter: @Sendable (String) -> String = { $0.paint(colorables) }
+
+        let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
+        let errStreamer = LineStreamer(handle: .standardError,  colorize: true, paint: painter)
+
         opt.teeToStdout = false
         opt.teeToStderr = false
+
         opt.onStdoutChunk = { chunk in
-            if let t = String(data: chunk, encoding: .utf8) { print(t.paint(colorables), terminator: "") }
-            else { FileHandle.standardOutput.write(chunk) }
+            Task { await outStreamer.ingest(chunk) }
         }
         opt.onStderrChunk = { chunk in
-            if let t = String(data: chunk, encoding: .utf8) { fputs(t.paint(colorables), stderr) }
-            else { FileHandle.standardError.write(chunk) }
+            Task { await errStreamer.ingest(chunk) }
         }
 
-        do {
-            let res = try await Shell(.zsh).run("/usr/bin/env", ["swift"] + command, options: opt)
-            let code = res.exitCode ?? 0
-            if code != 0 {
-                let out = String(data: res.stdout, encoding: .utf8) ?? ""
-                let err = res.stderrText()
-                throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
-            }
+        let res = try await Shell(.zsh).run(
+            "/usr/bin/env",
+            ["swift"] + command,
+            options: opt
+        )
 
-            // best-effort guess for mode from args
-            let mode: Config.Mode = command.contains(where: { $0.lowercased() == "debug" }) ? .debug : .release
-            return BuildResult(
-                exitCode: Int32(code),
-                stdout: res.stdout,
-                stderr: res.stderr,
-                mode: mode,
-                buildDirComponent: (mode == .debug ? "debug" : "release")
-            )
-        } catch {
-            // keep parity with sbm’s stderr surfacing
-            fputs("\(error)\n", stderr)
-            throw error
+        await outStreamer.flush()
+        await errStreamer.flush()
+
+        let code = res.exitCode ?? 0
+        if code != 0 {
+            let out = String(data: res.stdout, encoding: .utf8) ?? ""
+            let err = res.stderrText()
+            throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
         }
+
+        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
+
+        return BuildResult(
+            exitCode: Int32(code),
+            stdout: res.stdout,
+            stderr: res.stderr,
+            mode: mode,
+            buildDirComponent: (mode == .debug ? "debug" : "release")
+        )
+        // END OF NEW LINESTREAMER INVOCATION
+
+        // // PREVIOUS: STILL PAINT, BUT NO CHUNK STREAMING
+
+        // opt.teeToStdout = false
+        // opt.teeToStderr = false
+        // opt.onStdoutChunk = { chunk in
+        //     if let t = String(data: chunk, encoding: .utf8) { print(t.paint(colorables), terminator: "") }
+        //     else { FileHandle.standardOutput.write(chunk) }
+        // }
+        // opt.onStderrChunk = { chunk in
+        //     if let t = String(data: chunk, encoding: .utf8) { fputs(t.paint(colorables), stderr) }
+        //     else { FileHandle.standardError.write(chunk) }
+        // }
+
+        // do {
+        //     let res = try await Shell(.zsh).run("/usr/bin/env", ["swift"] + command, options: opt)
+        //     let code = res.exitCode ?? 0
+        //     if code != 0 {
+        //         let out = String(data: res.stdout, encoding: .utf8) ?? ""
+        //         let err = res.stderrText()
+        //         throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: err)
+        //     }
+
+        //     // best-effort guess for mode from args
+        //     let mode: Config.Mode = command.contains(where: { $0.lowercased() == "debug" }) ? .debug : .release
+        //     return BuildResult(
+        //         exitCode: Int32(code),
+        //         stdout: res.stdout,
+        //         stderr: res.stderr,
+        //         mode: mode,
+        //         buildDirComponent: (mode == .debug ? "debug" : "release")
+        //     )
+        // } catch {
+        //     // keep parity with sbm’s stderr surfacing
+        //     fputs("\(error)\n", stderr)
+        //     throw error
+        // }
     }
 }
