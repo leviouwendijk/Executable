@@ -66,10 +66,10 @@ public enum Build {
         opt.teeToStderr = false
 
         opt.onStdoutChunk = { chunk in
-            Task { await outStreamer.ingest(chunk) }
+            Task.detached { await outStreamer.ingest(chunk) }
         }
         opt.onStderrChunk = { chunk in
-            Task { await errStreamer.ingest(chunk) }
+            Task.detached { await errStreamer.ingest(chunk) }
         }
 
         let res = try await Shell(.zsh).run(
