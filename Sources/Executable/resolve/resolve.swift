@@ -9,13 +9,11 @@ public enum Resolve {
         public let stderr: Data
     }
 
-    /// `swift package update`  (aka `sbm pack get`)
     @discardableResult
     public static func get(at dir: URL) async throws -> Result {
         try await runSwiftPackage(subcommand: "update", in: dir)
     }
 
-    /// `swift package resolve` (aka `sbm pack resolve`)
     @discardableResult
     public static func resolve(at dir: URL) async throws -> Result {
         try await runSwiftPackage(subcommand: "resolve", in: dir)
