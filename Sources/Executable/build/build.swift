@@ -10,8 +10,12 @@ public enum Build {
         }
 
         public let mode: Mode
+        public let updateBuiltOnSuccess: Bool
 
-        public init(mode: Mode) { self.mode = mode }
+        public init(mode: Mode, updateBuiltOnSuccess: Bool = true) {
+            self.mode = mode
+            self.updateBuiltOnSuccess = updateBuiltOnSuccess
+        }
 
         public var buildArgs: [String] { mode == .debug ? ["build","-c","debug"] : ["build","-c","release"] }
         public var buildDirComponent: String { mode == .debug ? "debug" : "release" }
@@ -20,7 +24,18 @@ public enum Build {
     /// Full build with streamed output (same as `swift build -c <mode>`).
     @discardableResult
     public static func build(at dir: URL, config: Config) async throws -> BuildResult {
-        try await runSwift(command: config.buildArgs, in: dir)
+        let result = try await runSwift(command: config.buildArgs, in: dir)
+
+        if config.updateBuiltOnSuccess {
+            do {
+                try updateBuiltVersionSnapshot(at: dir)
+            } catch {
+                // non-fatal; surface a short diagnostic and keep going
+                fputs("note: failed to update built version snapshot: \(error)\n", stderr)
+            }
+        }
+
+        return result
     }
 
     /// Alias kept for clarity when a caller semantically means “build only”.
@@ -251,6 +266,36 @@ public enum Build {
     //         buildDirComponent: (mode == .debug ? "debug" : "release")
     //     )
     // }
+
+    private static func updateBuiltVersionSnapshot(at dir: URL) throws {
+        let url = try BuildObjectConfiguration.traverseForBuildObjectPkl(
+            from: dir, maxDepth: 6, buildFile: "build-object.pkl"
+        )
+        let cfg = try BuildObjectConfiguration(from: url)
+
+        if cfg.versions.built == cfg.versions.repository { return }
+        
+        let newly_updated_built = cfg.versions.repository
+
+        // write updated config with built := repository
+        let updated = BuildObjectConfiguration(
+            uuid: cfg.uuid,
+            name: cfg.name,
+            types: cfg.types,
+            versions: .init(
+                built: newly_updated_built,
+                repository: cfg.versions.repository
+            ),
+            compile: cfg.compile,
+            details: cfg.details,
+            author: cfg.author,
+            update: cfg.update
+        )
+        try updated.write(to: url)
+
+        let v = cfg.versions.repository
+        print("Updated built version → \(v.major).\(v.minor).\(v.patch)")
+    }
 }
 
 @inline(__always)
