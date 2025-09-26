@@ -253,9 +253,6 @@ public enum Build {
     // }
 }
 
-
-
-
 @inline(__always)
 private func nowMillis() -> UInt64 {
     let t = DispatchTime.now().uptimeNanoseconds
@@ -268,7 +265,6 @@ private func countCRLF(in data: Data) -> (cr: Int, lf: Int) {
     return (cr, lf)
 }
 
-/// Escape non-printables; show common controls nicely.
 private func escapedPreview(_ data: Data, limit: Int = 120) -> String {
     var s = ""
     var shown = 0
@@ -294,6 +290,5 @@ private func debugDumpChunk(label: String, chunk: Data) {
     let ts = nowMillis()
     let meta = "[\(ts)] \(label) chunk \(chunk.count)B cr:\(cr) lf:\(lf)"
     let prev = escapedPreview(chunk)
-    // write to STDERR so we don't mix with your normal STDOUT stream
     FileHandle.standardError.write(Data(("\(meta) | \(prev)\n").utf8))
 }
