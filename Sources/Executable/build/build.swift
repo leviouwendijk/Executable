@@ -66,7 +66,7 @@ public enum Build {
             env: childEnv,
             cwd: dir,
             onChunk: { chunk in
-                debugDumpChunk(label: "PTY", chunk: chunk)
+                // debugDumpChunk(label: "PTY", chunk: chunk)
                 Task.detached(priority: .userInitiated) { await outStreamer.ingest(chunk) }
             }
         )
