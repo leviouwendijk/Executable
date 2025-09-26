@@ -25,7 +25,10 @@ public enum Resolve {
         let colorables: [ColorableString] = [
             .init(selection: ["warning", "Warning"], colors: [.yellow]),
             .init(selection: ["error", "Error", "failed", "Failed"], colors: [.red, .bold]),
-            .init(selection: ["updating", "resolving"], colors: [.bold]),
+
+            .init(selection: ["updating", "Updating"], colors: [.dim]),
+
+            .init(selection: ["resolving"], colors: [.bold]),
 
             .init(
                 selection: [
@@ -39,11 +42,11 @@ public enum Resolve {
                 selection: [
                     "Working copy of",
                     "resolved at",
-                    "at master",
-                    "at main",
-                    "at release"
+                    "master",
+                    "main",
+                    "release"
                 ],
-                colors: [.green, .bold]
+                colors: [.bold]
             ),
 
             .init(selection: ["https://github.com/", ".git"], colors: [.cyan]),
