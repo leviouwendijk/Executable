@@ -23,8 +23,8 @@ public enum Resolve {
     private static func runSwiftPackage(subcommand: String, in dir: URL) async throws -> Result {
         // light paint, consistent with Build
         let colorables: [ColorableString] = [
-            .init(selection: ["error", "failed"],  colors: [.red]),
-            .init(selection: ["warning"],          colors: [.yellow]),
+            .init(selection: ["warning", "Warning"], colors: [.yellow]),
+            .init(selection: ["error", "Error", "failed", "Failed"], colors: [.red, .bold]),
             .init(selection: ["updating", "resolving"], colors: [.bold]),
 
             .init(
@@ -46,7 +46,13 @@ public enum Resolve {
                 colors: [.green, .bold]
             ),
 
-            .init(selection: ["https://github.com/"], colors: [.cyan]),
+            .init(selection: ["https://github.com/", ".git"], colors: [.cyan]),
+
+            // Commit-ish / short hashes parentheses & durations
+            .init(selection: ["(", "s)", ")"],
+                  colors: [.dim]),
+            .init(selection: [" (", ")", "s)"],
+                  colors: [.dim]),
         ]
 
         let painter: @Sendable (String) -> String = { $0.paint(colorables) }
