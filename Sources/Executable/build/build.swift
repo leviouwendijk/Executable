@@ -111,16 +111,27 @@ public enum Build {
         )
         let obj_cfg = try BuildObjectConfiguration(from: obj_url)
 
-        // get compiled.pkl
-        let compl_url = try BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: dir, maxDepth: 6, buildFile: "compiled.pkl"
+        let v_release = obj_cfg.versions.release
+
+        // soft try to get compiled.pkl
+        let compl_url_soft = try? BuildObjectConfiguration.traverseForBuildObjectPkl(
+            from: dir,
+            maxDepth: 6,
+            buildFile: "compiled.pkl"
         )
-        let compl_cfg = try CompiledLocalBuildObject(from: compl_url)
+        // perform soft matching
+        // so that we continue and don't throw
+        // and just write out the compiled file if it isn't there to begin with
 
-        let compiled = compl_cfg.version
-        let release = obj_cfg.versions.release
+        // only do comparison check if a file was found:
+        if let compl_url_found = compl_url_soft {
+            let compl_cfg = try CompiledLocalBuildObject(from: compl_url_found)
+            let v_compiled = compl_cfg.version
+            if v_compiled == v_release { return }
+        }
 
-        if compiled == release { return }
+        // compose the url to write to if no soft url was found
+        let compl_url = compl_url_soft ?? dir.appendingPathComponent("compiled.pkl")
         
         // // write updated config with built := repository
         // let updated = BuildObjectConfiguration(
@@ -139,11 +150,11 @@ public enum Build {
         // try updated.write(to: url)
 
         let updated = CompiledLocalBuildObject(
-            version: release,
+            version: v_release,
             arguments: argv ?? []
         )
         try updated.write(to: compl_url)
 
-        print("Updated built version → \(release.major).\(release.minor).\(release.patch)")
+        print("Updated built version → \(v_release.string(prefixStyle: .none))")
     }
 }
