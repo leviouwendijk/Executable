@@ -1,6 +1,6 @@
 // runSwift alternative implementations
 
-// public extension Build.Config {
+// public extension Build {
     // USE LINESTREAMER
 
     // @discardableResult
