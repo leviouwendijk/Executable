@@ -127,7 +127,10 @@ public enum Build {
         if let compl_url_found = compl_url_soft {
             let compl_cfg = try CompiledLocalBuildObject(from: compl_url_found)
             let v_compiled = compl_cfg.version
-            if v_compiled == v_release { return }
+            if v_compiled == v_release { 
+                print("compiled == release")
+                return 
+            }
         }
 
         // compose the url to write to if no soft url was found
