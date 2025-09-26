@@ -25,8 +25,30 @@ public enum Resolve {
         let colorables: [ColorableString] = [
             .init(selection: ["error", "failed"],  colors: [.red]),
             .init(selection: ["warning"],          colors: [.yellow]),
-            .init(selection: ["updating", "resolving", "resolved"], colors: [.bold]),
+            .init(selection: ["updating", "resolving"], colors: [.bold]),
+
+            .init(
+                selection: [
+                    "Everything is already up-to-date",
+                    "Everything up-to-date",
+                    "Already up-to-date"],
+                colors: [.italic]
+            ),
+
+            .init(
+                selection: [
+                    "Working copy of",
+                    "resolved at",
+                    "at master",
+                    "at main",
+                    "at release"
+                ],
+                colors: [.green, .bold]
+            ),
+
+            .init(selection: ["https://github.com/"], colors: [.cyan]),
         ]
+
         let painter: @Sendable (String) -> String = { $0.paint(colorables) }
         let streamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
 
