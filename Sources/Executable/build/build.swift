@@ -131,11 +131,9 @@ public enum Build {
                 print("compiled == release")
                 print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " written".ansi(.brightBlack))
                 return 
-                
-            } else {
-                print("compiled != release")
-                print("writing ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + "…".ansi(.brightBlack))
             }
+            print("compiled != release")
+            print("writing ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + "…".ansi(.brightBlack))
         }
 
         // compose the url to write to if no soft url was found
