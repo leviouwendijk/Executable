@@ -11,6 +11,13 @@ public struct ObjectRenewer: Sendable {
     ) async throws {
         for obj in objects {
             // try await check(object: obj, safe: safe)
+
+            // quite early on ignore
+            let ignore = obj.ignore ?? false
+            if ignore {
+                continue
+            }
+
             do {
                 try await check(object: obj, safe: safe)
             } catch let e as Shell.Error {

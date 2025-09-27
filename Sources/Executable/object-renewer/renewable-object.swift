@@ -17,14 +17,17 @@ public struct RenewableObject: Codable, Sendable {
     public var path: String
     public var compilable: Bool?
     public var relaunch: RelaunchConfig?
+    public var ignore: Bool?
 
     public init(
         path: String,
         compilable: Bool? = nil,
-        relaunch: RelaunchConfig? = nil
+        relaunch: RelaunchConfig? = nil,
+        ignore: Bool? = nil
     ) {
         self.path = path
         self.compilable = compilable
         self.relaunch = relaunch
+        self.ignore = ignore
     }
 }
