@@ -10,7 +10,18 @@ public struct ObjectRenewer: Sendable {
         safe: Bool
     ) async throws {
         for obj in objects {
-            try await check(object: obj, safe: safe)
+            // try await check(object: obj, safe: safe)
+            do {
+                try await check(object: obj, safe: safe)
+            } catch let e as Shell.Error {
+                // concise summary
+                fputs("Failed updating \(obj.path): \(e)\n", stderr)
+
+                // full dump
+                fputs(e.localizedDescription + "\n", stderr)
+            } catch {
+                fputs("Failed updating \(obj.path): \(String(describing: error))\n", stderr)
+            }
         }
     }
 
