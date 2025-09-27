@@ -129,7 +129,7 @@ public enum Build {
             let v_compiled = compl_cfg.version
             if v_compiled == v_release { 
                 print("compiled == release")
-                print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " will be written".ansi(.brightBlack))
+                print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " written".ansi(.brightBlack))
                 return 
             }
         }
