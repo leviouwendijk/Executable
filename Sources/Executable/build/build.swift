@@ -151,7 +151,7 @@ public enum Build {
             switch result {
             case .appended:        
                 print("added to .gitignore: \(success_string)")
-                printi("snippet:")
+                print("snippet:")
                 printi(context.ansi(.brightBlack))
             case .alreadyPresent:  
                 // blank returned
