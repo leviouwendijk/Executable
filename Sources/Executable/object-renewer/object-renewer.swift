@@ -12,15 +12,15 @@ public struct ObjectRenewer: Sendable {
         for obj in objects {
             // try await check(object: obj, safe: safe)
 
-            // quite early on ignore
-            let ignore = obj.ignore ?? false
-            if ignore {
-                print()
-                print("in: \(obj.path)")
-                printi("ignore == true")
-                printi("ignoring this directory")
-                continue
-            }
+            // // quit early on ignore
+            // let ignore = obj.ignore ?? false
+            // if ignore {
+            //     print()
+            //     print("in: \(obj.path)")
+            //     printi("ignore == true")
+            //     printi("ignoring this directory")
+            //     continue
+            // }
 
             do {
                 try await check(object: obj, safe: safe)
@@ -37,6 +37,16 @@ public struct ObjectRenewer: Sendable {
     }
 
     public static func check(object: RenewableObject, safe: Bool) async throws {
+        let ignore = object.ignore ?? false
+        if ignore {
+            print()
+            print("in: \(object.path)")
+            printi("ignore == true")
+            printi("ignoring this directory")
+            return
+        }
+        // moved for also direct invocation of check() + update()
+
         let expanded = (object.path as NSString).expandingTildeInPath
         let dirURL   = URL(fileURLWithPath: expanded, isDirectory: true)
         var isDir: ObjCBool = false
