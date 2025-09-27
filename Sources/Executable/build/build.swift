@@ -140,15 +140,25 @@ public enum Build {
         let compl_url = compl_url_soft ?? dir.appendingPathComponent("compiled.pkl")
 
         // try to detect 'compiled.pkl' in .gitignore, and auto-add if not present
+        let ignorable: [String] = ["compiled.pkl", "/compiled.pkl", "**/compiled.pkl"]
+        let success_string = ignorable.joined(separator: ", ")
         do {
-            switch try GitRepo.appending(
-                ignorable: ["compiled.pkl", "/compiled.pkl", "**/compiled.pkl"],
+            let (result, context) = try GitRepo.appending(
+                ignorable: ignorable,
                 to: ".gitignore",
                 in: dir
-            ) {
-            case .appended:        print("Added 'compiled.pkl' to .gitignore")
-            case .alreadyPresent:  break
-            case .notFound:        break
+            ) 
+            switch result {
+            case .appended:        
+                print("added to .gitignore: \(success_string)")
+                printi("snippet:")
+                printi(context.ansi(.brightBlack))
+            case .alreadyPresent:  
+                // blank returned
+                break
+            case .notFound:        
+                print(context)
+                break
             }
         } catch {
             fputs("note: could not update .gitignore: \(error)\n", stderr)
