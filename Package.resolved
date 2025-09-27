@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/Interfaces.git",
       "state" : {
         "branch" : "master",
-        "revision" : "84e02f4613bea255723b8a34be4b4996341016fe"
+        "revision" : "f0f8f3adc88532baacc4fbe8223f3d007dc80cd4"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "4dfa758cd2cb4b468f2f8e6029828d1a948daa7a"
+        "revision" : "92097e8937a71520ae5bb7c0d3c158104263d73f"
       }
     },
     {
@@ -34,7 +34,7 @@
       "location" : "https://github.com/leviouwendijk/Structures.git",
       "state" : {
         "branch" : "master",
-        "revision" : "ee6c6836b897caff5a2f9111351976264a043076"
+        "revision" : "60671771052ca91265efbdc8cc3ef8f6599055ce"
       }
     }
   ],
