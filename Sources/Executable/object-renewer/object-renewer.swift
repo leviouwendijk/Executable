@@ -15,6 +15,8 @@ public struct ObjectRenewer: Sendable {
             // quite early on ignore
             let ignore = obj.ignore ?? false
             if ignore {
+                printi("ignore == true")
+                printi("ignoring this directory")
                 continue
             }
 
