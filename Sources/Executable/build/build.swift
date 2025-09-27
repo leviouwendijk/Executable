@@ -138,22 +138,21 @@ public enum Build {
 
         // compose the url to write to if no soft url was found
         let compl_url = compl_url_soft ?? dir.appendingPathComponent("compiled.pkl")
-        
-        // // write updated config with built := repository
-        // let updated = BuildObjectConfiguration(
-        //     uuid: cfg.uuid,
-        //     name: cfg.name,
-        //     types: cfg.types,
-        //     versions: .init(
-        //         built: newly_updated_built,
-        //         repository: cfg.versions.repository
-        //     ),
-        //     compile: cfg.compile,
-        //     details: cfg.details,
-        //     author: cfg.author,
-        //     update: cfg.update
-        // )
-        // try updated.write(to: url)
+
+        // try to detect 'compiled.pkl' in .gitignore, and auto-add if not present
+        do {
+            switch try GitRepo.appending(
+                ignorable: ["compiled.pkl", "/compiled.pkl", "**/compiled.pkl"],
+                to: ".gitignore",
+                in: dir
+            ) {
+            case .appended:        print("Added 'compiled.pkl' to .gitignore")
+            case .alreadyPresent:  break
+            case .notFound:        break
+            }
+        } catch {
+            fputs("note: could not update .gitignore: \(error)\n", stderr)
+        }
 
         let updated = CompiledLocalBuildObject(
             version: v_release,
