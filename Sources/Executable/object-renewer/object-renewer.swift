@@ -39,7 +39,6 @@ public struct ObjectRenewer: Sendable {
     public static func check(object: RenewableObject, safe: Bool) async throws {
         let ignore = object.ignore ?? false
         if ignore {
-            print()
             print("in: \(object.path)")
             printi("ignore == true")
             printi("ignoring this directory")
