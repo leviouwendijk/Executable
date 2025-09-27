@@ -161,6 +161,6 @@ public enum Build {
         )
         try updated.write(to: compl_url)
 
-        print("Updated built version → \(v_release.string(prefixStyle: .none))")
+        print("updated compiled version → \(v_release.string(prefixStyle: .none))")
     }
 }
