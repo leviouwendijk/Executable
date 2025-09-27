@@ -9,7 +9,7 @@ public struct ProcessEvaluator: Sendable {
         public var launchEvenIfNotRunning: Bool
 
         public var graceMicroseconds: useconds_t
-        public init(launchEvenIfNotRunning: Bool = true, graceMicroseconds: useconds_t = 200_000) {
+        public init(launchEvenIfNotRunning: Bool = false, graceMicroseconds: useconds_t = 200_000) {
             self.launchEvenIfNotRunning = launchEvenIfNotRunning
             self.graceMicroseconds = graceMicroseconds
         }
