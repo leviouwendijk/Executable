@@ -36,6 +36,13 @@ public struct ObjectRenewer: Sendable {
         }
     }
 
+    internal static let space: @Sendable () -> () = { print() }
+
+    internal struct ResolvedPaths: Sendable {
+        public let expanded: String
+        public let directory: URL
+    }
+
     public static func check(object: RenewableObject, safe: Bool) async throws {
         let ignore = object.ignore ?? false
         if ignore {
@@ -53,21 +60,47 @@ public struct ObjectRenewer: Sendable {
             throw ObjectRenewerError.directoryNotFound(expanded)
         }
 
-        let space = { print() }
-
         space()
-        printi("Checking \(expanded)…")
 
-        let isOutdated = (try? await GitRepo.outdated(dirURL)) == true
+        let resolvedPaths = ResolvedPaths(expanded: expanded, directory: dirURL)
+        try await check_upstream(
+            object: object,
+            safe: safe,
+            resolvedPaths: resolvedPaths
+        )
+
+        try await check_compiled(
+            object: object,
+            safe: safe,
+            resolvedPaths: resolvedPaths
+        )
+
+        if object.relaunch?.enable == true {
+            // try await relaunchApplication(dirURL, target: entry.relaunch?.target)
+            try await ProcessEvaluator().relaunch(dirURL, target: object.relaunch?.target)
+        }
+        space()
+    }
+
+    internal static func check_upstream(
+        object: RenewableObject,
+        safe: Bool,
+        resolvedPaths: ResolvedPaths
+    ) async throws {
+        guard object.criteria.upstream else { return }
+
+        printi("Checking \(resolvedPaths.expanded)…")
+
+        let isOutdated = (try? await GitRepo.outdated(resolvedPaths.directory)) == true
         if !isOutdated {
             printi("No upstream changes; continuing to version check.".ansi(.bold))
         }
 
-        let (remote, branch) = try await GitRepo.upstream(dirURL)
-        let div = try await GitRepo.divergence(dirURL)
+        let (remote, branch) = try await GitRepo.upstream(resolvedPaths.directory)
+        let div = try await GitRepo.divergence(resolvedPaths.directory)
         printi("Upstream: \(remote)/\(branch)  (ahead=\(div.ahead), behind=\(div.behind))")
 
-        if try await GitRepo.isDirty(dirURL) {
+        if try await GitRepo.isDirty(resolvedPaths.directory) {
             let severity: ANSIColor = safe ? .red : .yellow
             printi("Working tree is dirty.".ansi(severity))
 
@@ -112,9 +145,17 @@ public struct ObjectRenewer: Sendable {
             }
 
             printi("Updating (resetting to upstream)…")
-            try await GitRepo.hardResetToUpstream(dirURL, cleanUntracked: false)
+            try await GitRepo.hardResetToUpstream(resolvedPaths.directory, cleanUntracked: false)
             printi("Reset complete.")
         }
+    }
+
+    internal static func check_compiled(
+        object: RenewableObject,
+        safe: Bool,
+        resolvedPaths: ResolvedPaths
+    ) async throws {
+        guard object.criteria.compiled else { return }
 
         let compilable = object.compilable ?? true
 
@@ -124,14 +165,14 @@ public struct ObjectRenewer: Sendable {
         // }
 
         if compilable {
-            let obj_url = try BuildObjectConfiguration.traverseForBuildObjectPkl(from: dirURL)
+            let obj_url = try BuildObjectConfiguration.traverseForBuildObjectPkl(from: resolvedPaths.directory)
             let obj = try BuildObjectConfiguration(from: obj_url)
 
             let v_release = obj.versions.release
 
             // soft try to get compiled.pkl
             let compl_url_soft = try? BuildObjectConfiguration.traverseForBuildObjectPkl(
-                from: dirURL,
+                from: resolvedPaths.directory,
                 maxDepth: 6,
                 buildFile: "compiled.pkl"
             )
@@ -160,15 +201,9 @@ public struct ObjectRenewer: Sendable {
             }
 
             if reasonToCompile {
-                try await execute(in: dirURL)
+                try await execute(in: resolvedPaths.directory)
             }
         }
-
-        if object.relaunch?.enable == true {
-            // try await relaunchApplication(dirURL, target: entry.relaunch?.target)
-            try await ProcessEvaluator().relaunch(dirURL, target: object.relaunch?.target)
-        }
-        space()
     }
 
     public static func execute(in dirURL: URL) async throws {
