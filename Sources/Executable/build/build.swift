@@ -31,7 +31,8 @@ public enum Build {
                 try updateBuiltVersionSnapshot(at: dir, argv: argv_audit)
             } catch {
                 // non-fatal; surface a short diagnostic and keep going
-                fputs("note: failed to update built version snapshot: \(error)\n", stderr)
+                fputs("Note: failed to update built version snapshot:\n", stderr)
+                fputs("\(error.localizedDescription.indent())\n", stderr)
             }
         }
 
