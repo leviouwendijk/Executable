@@ -230,8 +230,100 @@ public struct ObjectRenewer: Sendable {
 }
 
 extension ObjectRenewer {
-    /// Discover Git repositories under `rootPath` up to `maxDepth`, and build RenewableObject
-    /// entries for each. `criteria` lets callers decide whether upstream/compiled logic should run.
+    // /// Discover Git repositories under `rootPath` up to `maxDepth`, and build RenewableObject
+    // /// entries for each. `criteria` lets callers decide whether upstream/compiled logic should run.
+    // public static func discover(
+    //     rootPath: String,
+    //     maxDepth: Int = 6,
+    //     criteria: ObjectComparisonCriteria = .init()
+    // ) throws -> [RenewableObject] {
+    //     let expanded = (rootPath as NSString).expandingTildeInPath
+    //     let rootURL = URL(fileURLWithPath: expanded, isDirectory: true)
+    //     return try discover(under: rootURL, maxDepth: maxDepth, criteria: criteria)
+    // }
+
+    // /// Low-level discovery using a URL root.
+    // public static func discover(
+    //     under root: URL,
+    //     maxDepth: Int = 6,
+    //     criteria: ObjectComparisonCriteria = .init()
+    // ) throws -> [RenewableObject] {
+    //     let fm = FileManager.default
+    //     var isDir: ObjCBool = false
+    //     guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else {
+    //         throw ObjectRenewerError.directoryNotFound(root.path)
+    //     }
+
+    //     var results: [RenewableObject] = []
+
+    //     let rootComponentsCount = root.pathComponents.count
+
+    //     func isGitRepo(_ dir: URL) -> Bool {
+    //         var gitIsDir: ObjCBool = false
+    //         let gitPath = dir.appendingPathComponent(".git").path
+    //         return fm.fileExists(atPath: gitPath, isDirectory: &gitIsDir) && gitIsDir.boolValue
+    //     }
+
+    //     // Check root itself first.
+    //     if isGitRepo(root) {
+    //         let compilable = fm.fileExists(
+    //             atPath: root.appendingPathComponent("build-object.pkl").path
+    //         )
+
+    //         results.append(
+    //             RenewableObject(
+    //                 path: root.path,
+    //                 compilable: compilable,
+    //                 relaunch: nil,
+    //                 ignore: nil,
+    //                 criteria: criteria
+    //             )
+    //         )
+    //     }
+
+    //     guard let enumerator = fm.enumerator(
+    //         at: root,
+    //         includingPropertiesForKeys: [.isDirectoryKey],
+    //         options: [.skipsHiddenFiles, .skipsPackageDescendants]
+    //     ) else {
+    //         return results
+    //     }
+
+    //     for case let url as URL in enumerator {
+    //         let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey])
+    //         guard resourceValues.isDirectory == true else { continue }
+
+    //         let depth = url.pathComponents.count - rootComponentsCount
+    //         if depth > maxDepth {
+    //             enumerator.skipDescendants()
+    //             continue
+    //         }
+
+    //         if isGitRepo(url) {
+    //             let compilable = fm.fileExists(
+    //                 atPath: url.appendingPathComponent("build-object.pkl").path
+    //             )
+
+    //             results.append(
+    //                 RenewableObject(
+    //                     path: url.path,
+    //                     compilable: compilable,
+    //                     relaunch: nil,
+    //                     ignore: nil,
+    //                     criteria: criteria
+    //                 )
+    //             )
+
+    //             // Once we mark a dir as a repo, don't go deeper into it.
+    //             enumerator.skipDescendants()
+    //         }
+    //     }
+
+    //     results.sort { $0.path < $1.path }
+    //     return results
+    // }
+    
+    /// Check based on presence of build-object.pkl
     public static func discover(
         rootPath: String,
         maxDepth: Int = 6,
@@ -255,30 +347,35 @@ extension ObjectRenewer {
         }
 
         var results: [RenewableObject] = []
+        var seenDirs = Set<String>()
 
         let rootComponentsCount = root.pathComponents.count
 
-        func isGitRepo(_ dir: URL) -> Bool {
-            var gitIsDir: ObjCBool = false
-            let gitPath = dir.appendingPathComponent(".git").path
-            return fm.fileExists(atPath: gitPath, isDirectory: &gitIsDir) && gitIsDir.boolValue
-        }
+        // Helper to register a project directory
+        func registerProject(at dir: URL) {
+            let dirPath = dir.path
+            guard !seenDirs.contains(dirPath) else { return }
+            seenDirs.insert(dirPath)
 
-        // Check root itself first.
-        if isGitRepo(root) {
+            // If it has a build-object.pkl, it's compilable; otherwise it's not.
             let compilable = fm.fileExists(
-                atPath: root.appendingPathComponent("build-object.pkl").path
+                atPath: dir.appendingPathComponent("build-object.pkl").path
             )
 
             results.append(
                 RenewableObject(
-                    path: root.path,
+                    path: dirPath,
                     compilable: compilable,
                     relaunch: nil,
                     ignore: nil,
                     criteria: criteria
                 )
             )
+        }
+
+        // If root itself has a build-object.pkl, treat it as a project.
+        if fm.fileExists(atPath: root.appendingPathComponent("build-object.pkl").path) {
+            registerProject(at: root)
         }
 
         guard let enumerator = fm.enumerator(
@@ -290,32 +387,15 @@ extension ObjectRenewer {
         }
 
         for case let url as URL in enumerator {
-            let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey])
-            guard resourceValues.isDirectory == true else { continue }
-
             let depth = url.pathComponents.count - rootComponentsCount
             if depth > maxDepth {
                 enumerator.skipDescendants()
                 continue
             }
 
-            if isGitRepo(url) {
-                let compilable = fm.fileExists(
-                    atPath: url.appendingPathComponent("build-object.pkl").path
-                )
-
-                results.append(
-                    RenewableObject(
-                        path: url.path,
-                        compilable: compilable,
-                        relaunch: nil,
-                        ignore: nil,
-                        criteria: criteria
-                    )
-                )
-
-                // Once we mark a dir as a repo, don't go deeper into it.
-                enumerator.skipDescendants()
+            if url.lastPathComponent == "build-object.pkl" {
+                let dir = url.deletingLastPathComponent()
+                registerProject(at: dir)
             }
         }
 
