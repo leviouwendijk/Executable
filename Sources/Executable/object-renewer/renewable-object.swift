@@ -1,7 +1,4 @@
 import Foundation
-import plate
-import Interfaces
-import Structures
 
 public struct RelaunchConfig: Codable, Sendable {
     public var enable: Bool
