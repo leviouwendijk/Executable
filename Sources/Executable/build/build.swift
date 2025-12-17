@@ -1,6 +1,7 @@
 import Foundation
 import plate
 import Interfaces
+import Terminal
 
 public enum Build {
     public struct Config: Sendable {

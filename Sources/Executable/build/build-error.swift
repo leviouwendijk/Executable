@@ -1,5 +1,6 @@
 import Foundation
 import plate
+import Terminal
 
 public enum BuildError: Error, LocalizedError, Sendable, PrettyError {
     case swiftFailed(exitCode: Int, stdout: String, stderr: String)

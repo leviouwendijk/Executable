@@ -1,6 +1,7 @@
 import Foundation
 import Interfaces
 import plate
+import Terminal
 
 public enum Resolve {
     public struct Result: Sendable {

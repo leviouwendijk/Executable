@@ -1,5 +1,5 @@
 {
-  "originHash" : "32142bd7ed56296977484bb6f76fcf9423acd33e5b5a9bf97edc21db405a411b",
+  "originHash" : "9c0cd1fd4d5e03dfc93871e0ea3e635fe3bfb890e97251953f53998d7d852966",
   "pins" : [
     {
       "identity" : "interfaces",
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "04c78107b3f4907460c786500be14997563e72d2"
+        "revision" : "19151fed4e81bef746554a55b6a353bbdf0129dd"
       }
     },
     {
@@ -26,6 +26,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "95d098547aa8c78b78613753163a1fa8bbbb6a1e"
+      }
+    },
+    {
+      "identity" : "terminal",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Terminal.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "f71bcf025c0f480c775d9a4fdb6d3ea3db4b33cf"
       }
     }
   ],
