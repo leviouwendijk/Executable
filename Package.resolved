@@ -11,12 +11,21 @@
       }
     },
     {
+      "identity" : "path",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Path.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b18278a4832ef11e4d6c8051e1ff1c03363c03a5"
+      }
+    },
+    {
       "identity" : "plate",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "19151fed4e81bef746554a55b6a353bbdf0129dd"
+        "revision" : "401bf449337d09678c915f9a0431ee859d66eaaa"
       }
     },
     {
@@ -25,7 +34,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "95d098547aa8c78b78613753163a1fa8bbbb6a1e"
+        "revision" : "5a595a4da45183ce9b7d41ba34fb8486017312ef"
       }
     },
     {
@@ -35,6 +44,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "f71bcf025c0f480c775d9a4fdb6d3ea3db4b33cf"
+      }
+    },
+    {
+      "identity" : "version",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Version.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "a7eeda6e3b84eca36f61366e5d420787c9aba69f"
       }
     }
   ],
