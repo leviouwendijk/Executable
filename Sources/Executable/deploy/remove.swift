@@ -1,5 +1,5 @@
 import Foundation
-import plate
+// import plate
 
 public enum Remove {
     public static func deployedBinary(named target: String, at destinationRoot: URL) throws {

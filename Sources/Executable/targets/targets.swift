@@ -1,6 +1,6 @@
 import Foundation
 import Interfaces
-import plate
+// import plate
 
 public enum Targets {
     public static func executableNames(in packageDir: URL) async throws -> [String] {

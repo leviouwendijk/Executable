@@ -1,5 +1,5 @@
 import Foundation
-import plate
+// import plate
 
 public enum AppBundle {
     public enum InfoPlistStrategy: Sendable {

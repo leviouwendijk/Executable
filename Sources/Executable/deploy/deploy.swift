@@ -1,5 +1,5 @@
 import Foundation
-import plate
+// import plate
 
 public enum Deploy {
     public static func all(

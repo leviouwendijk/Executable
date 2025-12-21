@@ -2,6 +2,7 @@ import Foundation
 import Interfaces
 import plate
 import Terminal
+import Indentation
 
 public struct ObjectRenewer: Sendable {
     public init() {}

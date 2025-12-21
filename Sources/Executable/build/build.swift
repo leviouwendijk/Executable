@@ -2,6 +2,7 @@ import Foundation
 import plate
 import Interfaces
 import Terminal
+import Indentation
 
 public enum Build {
     public struct Config: Sendable {

@@ -1,6 +1,6 @@
 import Foundation
 import Interfaces
-import plate
+// import plate
 import Terminal
 
 public enum Resolve {

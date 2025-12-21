@@ -1,5 +1,5 @@
 import Foundation
-import plate
+// import plate
 
 public enum DeployedList {
     public struct DeployedBinary: Sendable {

@@ -2,12 +2,21 @@
   "originHash" : "9c0cd1fd4d5e03dfc93871e0ea3e635fe3bfb890e97251953f53998d7d852966",
   "pins" : [
     {
+      "identity" : "indentation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Indentation.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "8b85325433aa97ee19c9c77f564500be189978d6"
+      }
+    },
+    {
       "identity" : "interfaces",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/Interfaces.git",
       "state" : {
         "branch" : "master",
-        "revision" : "c12d63c70780a5274dadef5c3c9839e3a0aacdc1"
+        "revision" : "3b63f997837d763ce8bb50a1c90a071f79dca7e8"
       }
     },
     {
@@ -25,7 +34,7 @@
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "401bf449337d09678c915f9a0431ee859d66eaaa"
+        "revision" : "b83a19b7d494bffd85d36da5733520c2b475ef80"
       }
     },
     {
@@ -34,7 +43,16 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "5a595a4da45183ce9b7d41ba34fb8486017312ef"
+        "revision" : "3a899c26f691807ef4c36370d364698a64c99e77"
+      }
+    },
+    {
+      "identity" : "strings",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Strings.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "86a939d7bbb3e25808f88fbcedcee4069a5a5ae1"
       }
     },
     {
@@ -43,7 +61,7 @@
       "location" : "https://github.com/leviouwendijk/Terminal.git",
       "state" : {
         "branch" : "master",
-        "revision" : "f71bcf025c0f480c775d9a4fdb6d3ea3db4b33cf"
+        "revision" : "972943a2d925f8ba4bebf99c1af590de8fe896e0"
       }
     },
     {

@@ -19,10 +19,6 @@ let package = Package(
             url: "https://github.com/leviouwendijk/plate.git", // ansi and things
             branch: "master"
         ),
-        // .package(
-        //     url: "https://github.com/leviouwendijk/Structures.git", // JSONValue
-        //     branch: "master"
-        // ),
         .package(
             url: "https://github.com/leviouwendijk/Interfaces.git", // JSONValue
             branch: "master"
@@ -31,15 +27,19 @@ let package = Package(
             url: "https://github.com/leviouwendijk/Terminal.git",
             branch: "master"
         ),
+        .package(
+            url: "https://github.com/leviouwendijk/Indentation.git", // JSONValue
+            branch: "master"
+        ),
     ],
     targets: [
         .target(
             name: "Executable",
             dependencies: [
                 .product(name: "plate", package: "plate"),
-                // .product(name: "Structures", package: "Structures"),
                 .product(name: "Interfaces", package: "Interfaces"),
                 .product(name: "Terminal", package: "Terminal"),
+                .product(name: "Indentation", package: "Indentation"),
             ],
         ),
         .testTarget(
