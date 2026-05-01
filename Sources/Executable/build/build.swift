@@ -61,20 +61,8 @@ public enum Build {
         public let buildDirComponent: String
     }
 
-    // USE PTY
     @discardableResult
     private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
-        // mirror sbm’s streamed output with light paint
-        let colorables: [ColorableString] = [
-            .init(selection: ["production", "debugging"], colors: [.bold]),
-            .init(selection: ["error"], colors: [.red]),
-            .init(selection: ["warning"], colors: [.yellow]),
-            .init(selection: ["Build complete!"], colors: [.green])
-        ]
-        let painter: @Sendable (String) -> String = { $0.paint(colorables) }
-
-        let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
-
         var childEnv = ProcessInfo.processInfo.environment
         childEnv["NSUnbufferedIO"] = "YES"
 
@@ -84,12 +72,13 @@ public enum Build {
             env: childEnv,
             cwd: dir,
             onChunk: { chunk in
-                // debugDumpChunk(label: "PTY", chunk: chunk)
-                Task.detached(priority: .userInitiated) { await outStreamer.ingest(chunk) }
+                // favor direct passthrough over live painting, for now
+                Terminal.write(
+                    chunk,
+                    to: .standardOutput
+                )
             }
         )
-
-        await outStreamer.flush()
 
         let code = resPTY.exitCode
         if code != 0 {
@@ -97,15 +86,64 @@ public enum Build {
             throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: "")
         }
 
-        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
+        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" }
+            ? .debug
+            : .release
+
         return BuildResult(
             exitCode: code,
             stdout: resPTY.stdout,
             stderr: Data(),
             mode: mode,
-            buildDirComponent: (mode == .debug ? "debug" : "release")
+            buildDirComponent: mode == .debug ? "debug" : "release"
         )
     }
+
+    // @discardableResult
+    // private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
+    //     let colorables: [ColorableString] = [
+    //         .init(selection: ["production", "debugging"], colors: [.bold]),
+    //         .init(selection: ["error"], colors: [.red]),
+    //         .init(selection: ["warning"], colors: [.yellow]),
+    //         .init(selection: ["Build complete!"], colors: [.green])
+    //     ]
+    //     let painter: @Sendable (String) -> String = { $0.paint(colorables) }
+
+    //     let outStreamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
+
+    //     var childEnv = ProcessInfo.processInfo.environment
+    //     childEnv["NSUnbufferedIO"] = "YES"
+
+    //     let resPTY = try runPTY(
+    //         "/usr/bin/env",
+    //         ["swift"] + command,
+    //         env: childEnv,
+    //         cwd: dir,
+    //         onChunk: { chunk in
+    //             // debugDumpChunk(label: "PTY", chunk: chunk)
+    //             Task.detached(priority: .userInitiated) { 
+    //                 await outStreamer.ingest(chunk) 
+    //             }
+    //         }
+    //     )
+
+    //     await outStreamer.flush()
+
+    //     let code = resPTY.exitCode
+    //     if code != 0 {
+    //         let out = String(data: resPTY.stdout, encoding: .utf8) ?? ""
+    //         throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: "")
+    //     }
+
+    //     let mode: Config.Mode = command.contains { $0.lowercased() == "debug" } ? .debug : .release
+    //     return BuildResult(
+    //         exitCode: code,
+    //         stdout: resPTY.stdout,
+    //         stderr: Data(),
+    //         mode: mode,
+    //         buildDirComponent: (mode == .debug ? "debug" : "release")
+    //     )
+    // }
 
     private static func updateBuiltVersionSnapshot(at dir: URL, argv: [String]? = nil) throws {
         // get build-object.pkl
