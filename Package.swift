@@ -20,7 +20,7 @@ let package = Package(
             branch: "master"
         ),
         .package(
-            url: "https://github.com/leviouwendijk/Interfaces.git", // JSONValue
+            url: "https://github.com/leviouwendijk/Interfaces.git",
             branch: "master"
         ),
         .package(
@@ -28,7 +28,11 @@ let package = Package(
             branch: "master"
         ),
         .package(
-            url: "https://github.com/leviouwendijk/Indentation.git", // JSONValue
+            url: "https://github.com/leviouwendijk/Indentation.git",
+            branch: "master"
+        ),
+        .package(
+            url: "https://github.com/leviouwendijk/Path.git",
             branch: "master"
         ),
     ],
@@ -40,16 +44,8 @@ let package = Package(
                 .product(name: "Interfaces", package: "Interfaces"),
                 .product(name: "Terminal", package: "Terminal"),
                 .product(name: "Indentation", package: "Indentation"),
+                .product(name: "Path", package: "Path"),
             ],
-        ),
-        .testTarget(
-            name: "ExecutableTests",
-            dependencies: [
-                "Executable",
-                .product(name: "plate", package: "plate"),
-                // .product(name: "Structures", package: "Structures"),
-                .product(name: "Interfaces", package: "Interfaces"),
-            ]
         ),
     ]
 )

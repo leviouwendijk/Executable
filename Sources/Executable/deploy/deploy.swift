@@ -1,7 +1,10 @@
 import Foundation
 // import plate
+import Path
 
 public enum Deploy {
+    private static let maximumBuildProductAncestorDepth = 6
+
     public static func all(
         from projectDir: URL,
         config: Build.Config,
@@ -10,7 +13,12 @@ public enum Deploy {
         try ensureDir(defaultDestination)
         let names = try await Targets.executableNames(in: projectDir)
         for n in names {
-            try moveOne(targetName: n, from: projectDir, config: config, to: defaultDestination)
+            try moveOne(
+                targetName: n,
+                from: projectDir,
+                config: config,
+                to: defaultDestination
+            )
         }
     }
 
@@ -35,8 +43,13 @@ public enum Deploy {
         config: Build.Config,
         to destinationRoot: URL
     ) throws {
-        let buildDir = projectDir.appendingPathComponent(".build/\(config.buildDirComponent)")
-        let sourceURL = buildDir.appendingPathComponent(targetName)
+        // let buildDir = projectDir.appendingPathComponent(".build/\(config.buildDirComponent)")
+        // let sourceURL = buildDir.appendingPathComponent(targetName)
+        let sourceURL = resolvedBuildProductURL(
+            targetName: targetName,
+            from: projectDir,
+            config: config
+        )
         let destinationURL = destinationRoot.appendingPathComponent(targetName)
 
         guard FileManager.default.fileExists(atPath: sourceURL.path) else {
@@ -76,6 +89,53 @@ public enum Deploy {
 
         let banner = "\n        \(targetName) ".ansi(.bold) + "is now an executable binary for " + projectDir.lastPathComponent.ansi(.italic) + "\n    "
         print(banner)
+    }
+
+    private static func resolvedBuildProductURL(
+        targetName: String,
+        from projectDir: URL,
+        config: Build.Config
+    ) -> URL {
+        let fallbackURL = buildProductURL(
+            targetName: targetName,
+            from: projectDir,
+            config: config
+        )
+
+        guard let ancestor = PathAncestorSearch.nearestAncestor(
+            startingAt: projectDir,
+            treatingStartAsDirectory: true,
+            includingStart: true,
+            maxDepth: maximumBuildProductAncestorDepth,
+            where: { candidate in
+                FileManager.default.fileExists(
+                    atPath: buildProductURL(
+                        targetName: targetName,
+                        from: candidate,
+                        config: config
+                    ).path
+                )
+            }
+        ) else {
+            return fallbackURL
+        }
+
+        return buildProductURL(
+            targetName: targetName,
+            from: ancestor,
+            config: config
+        )
+    }
+
+    private static func buildProductURL(
+        targetName: String,
+        from projectDir: URL,
+        config: Build.Config
+    ) -> URL {
+        projectDir.standardizedFileURL
+            .appendingPathComponent(".build", isDirectory: true)
+            .appendingPathComponent(config.buildDirComponent, isDirectory: true)
+            .appendingPathComponent(targetName, isDirectory: false)
     }
 
     private static func ensureDir(_ dir: URL) throws {
