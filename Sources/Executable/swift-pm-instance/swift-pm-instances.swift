@@ -14,6 +14,7 @@ public struct SwiftPMProcess: Sendable, Hashable {
 
 public enum SwiftPMProcessError: Swift.Error, LocalizedError, Sendable {
     case processSnapshotFailed(exitCode: Int32, stderr: String)
+    case processSnapshotUnreadable
     case killFailed(pid: pid_t, signal: Int32, errno: Int32)
     case processesSurvived([SwiftPMProcess])
 
@@ -24,6 +25,9 @@ public enum SwiftPMProcessError: Swift.Error, LocalizedError, Sendable {
             Failed to inspect running processes.
             ps exited with \(exitCode): \(stderr)
             """
+
+        case .processSnapshotUnreadable:
+            return "Failed to decode the process snapshot returned by ps."
 
         case .killFailed(let pid, let signal, let errorNumber):
             return """
@@ -45,8 +49,9 @@ public enum SwiftPMProcessError: Swift.Error, LocalizedError, Sendable {
 }
 
 public struct SwiftPMProcesses: Sendable {
-    private static let gracefulTerminationNanoseconds: UInt64 = 1_500_000_000
-    private static let forcedTerminationNanoseconds: UInt64 = 500_000_000
+    private static let gracefulTimeoutNanoseconds: UInt64 = 1_500_000_000
+    private static let forcedTimeoutNanoseconds: UInt64 = 1_000_000_000
+    private static let pollingIntervalNanoseconds: UInt64 = 50_000_000
 
     public init() {}
 
@@ -57,11 +62,16 @@ public struct SwiftPMProcesses: Sendable {
     }
 
     public func list(
-        cwd overrideCWD: URL? = nil
+        cwd _: URL? = nil
     ) async throws -> [SwiftPMProcess] {
         let rows = try snapshot()
+        let excludedPIDs = protectedProcessPIDs(in: rows)
 
         return rows.compactMap { row in
+            guard !excludedPIDs.contains(row.pid) else {
+                return nil
+            }
+
             guard Self.isSwiftPMCommandLine(row.command) else {
                 return nil
             }
@@ -77,17 +87,34 @@ public struct SwiftPMProcesses: Sendable {
     public func killAll(
         force: Bool = false,
         dryRun: Bool = false,
-        cwd overrideCWD: URL? = nil
+        cwd _: URL? = nil
     ) async throws -> [SwiftPMProcess] {
-        let initialRows = try snapshot()
-        let matchedRoots = initialRows.filter {
-            Self.isSwiftPMCommandLine($0.command)
+        let rows = try snapshot()
+        let excludedPIDs = protectedProcessPIDs(in: rows)
+
+        let matchedRoots = rows.filter { row in
+            !excludedPIDs.contains(row.pid) &&
+            Self.isSwiftPMCommandLine(row.command)
         }
 
         guard !matchedRoots.isEmpty else {
             printi("No SwiftPM processes detected.")
             return []
         }
+
+        let processByPID = Dictionary(
+            uniqueKeysWithValues: rows.map {
+                ($0.pid, $0)
+            }
+        )
+
+        let childrenByParent = makeChildrenByParent(from: rows)
+
+        let orderedPIDs = orderedProcessTreePIDs(
+            roots: matchedRoots.map(\.pid),
+            childrenByParent: childrenByParent,
+            excluding: excludedPIDs
+        )
 
         let matchedProcesses = matchedRoots.map {
             SwiftPMProcess(
@@ -96,24 +123,14 @@ public struct SwiftPMProcesses: Sendable {
             )
         }
 
-        let childrenByParent = makeChildrenByParent(from: initialRows)
-        let processByPID = Dictionary(
-            uniqueKeysWithValues: initialRows.map {
-                ($0.pid, $0)
-            }
-        )
-
-        let orderedPIDs = orderedProcessTreePIDs(
-            roots: matchedRoots.map(\.pid),
-            childrenByParent: childrenByParent
-        )
-
         if dryRun {
-            let signalName = force ? "SIGKILL" : "SIGTERM followed by SIGKILL"
+            let strategy = force
+                ? "SIGKILL"
+                : "SIGTERM followed automatically by SIGKILL for survivors"
 
             printi(
                 "Found \(matchedRoots.count) SwiftPM roots. " +
-                "Would terminate \(orderedPIDs.count) processes using \(signalName):"
+                "Would terminate \(orderedPIDs.count) processes using \(strategy):"
             )
 
             for pid in orderedPIDs {
@@ -137,8 +154,9 @@ public struct SwiftPMProcesses: Sendable {
                 processByPID: processByPID
             )
 
-            try await Task.sleep(
-                nanoseconds: Self.forcedTerminationNanoseconds
+            _ = try await waitForTermination(
+                orderedPIDs,
+                timeoutNanoseconds: Self.forcedTimeoutNanoseconds
             )
         } else {
             printi(
@@ -153,16 +171,15 @@ public struct SwiftPMProcesses: Sendable {
                 processByPID: processByPID
             )
 
-            try await Task.sleep(
-                nanoseconds: Self.gracefulTerminationNanoseconds
+            let survivors = try await waitForTermination(
+                orderedPIDs,
+                timeoutNanoseconds: Self.gracefulTimeoutNanoseconds
             )
-
-            let survivors = orderedPIDs.filter(isAlive)
 
             if !survivors.isEmpty {
                 printi(
-                    "\(survivors.count) processes ignored SIGTERM. " +
-                    "Escalating to SIGKILL…"
+                    "\(survivors.count) processes survived SIGTERM. " +
+                    "Escalating automatically to SIGKILL…"
                 )
 
                 try signal(
@@ -172,8 +189,9 @@ public struct SwiftPMProcesses: Sendable {
                     processByPID: processByPID
                 )
 
-                try await Task.sleep(
-                    nanoseconds: Self.forcedTerminationNanoseconds
+                _ = try await waitForTermination(
+                    survivors,
+                    timeoutNanoseconds: Self.forcedTimeoutNanoseconds
                 )
             }
         }
@@ -191,17 +209,15 @@ public struct SwiftPMProcesses: Sendable {
             throw SwiftPMProcessError.processesSurvived(survivors)
         }
 
-        printi(
-            "Terminated all detected SwiftPM processes."
-        )
+        printi("Terminated all detected SwiftPM processes.")
 
         return matchedProcesses
     }
 
     private func snapshot() throws -> [ProcRow] {
         let process = Process()
-        let stdout = Pipe()
-        let stderr = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
 
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
         process.arguments = [
@@ -209,29 +225,84 @@ public struct SwiftPMProcesses: Sendable {
             "-o",
             "pid=,ppid=,command="
         ]
-        process.standardOutput = stdout
-        process.standardError = stderr
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
 
-        try process.run()
-        process.waitUntilExit()
+        let stdoutLock = NSLock()
+        let stderrLock = NSLock()
 
-        let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+        nonisolated(unsafe) var stdoutData = Data()
+        nonisolated(unsafe) var stderrData = Data()
+
+        stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+
+            guard !data.isEmpty else {
+                return
+            }
+
+            stdoutLock.lock()
+            stdoutData.append(data)
+            stdoutLock.unlock()
+        }
+
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+
+            guard !data.isEmpty else {
+                return
+            }
+
+            stderrLock.lock()
+            stderrData.append(data)
+            stderrLock.unlock()
+        }
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            throw error
+        }
+
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+
+        let remainingStdout =
+            stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+
+        let remainingStderr =
+            stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        stdoutLock.lock()
+        stdoutData.append(remainingStdout)
+        let capturedStdout = stdoutData
+        stdoutLock.unlock()
+
+        stderrLock.lock()
+        stderrData.append(remainingStderr)
+        let capturedStderr = stderrData
+        stderrLock.unlock()
 
         guard process.terminationStatus == 0 else {
             throw SwiftPMProcessError.processSnapshotFailed(
                 exitCode: process.terminationStatus,
                 stderr: String(
-                    data: stderrData,
+                    data: capturedStderr,
                     encoding: .utf8
                 ) ?? ""
             )
         }
 
-        let text = String(
-            data: stdoutData,
+        guard let text = String(
+            data: capturedStdout,
             encoding: .utf8
-        ) ?? ""
+        ) else {
+            throw SwiftPMProcessError.processSnapshotUnreadable
+        }
 
         var rows: [ProcRow] = []
         rows.reserveCapacity(256)
@@ -254,22 +325,49 @@ public struct SwiftPMProcesses: Sendable {
 
             guard
                 parts.count == 3,
-                let pid = pid_t(parts[0]),
-                let ppid = pid_t(parts[1])
+                let pidValue = Int32(parts[0]),
+                let parentPIDValue = Int32(parts[1])
             else {
                 continue
             }
 
             rows.append(
                 ProcRow(
-                    pid: pid,
-                    ppid: ppid,
+                    pid: pid_t(pidValue),
+                    ppid: pid_t(parentPIDValue),
                     command: String(parts[2])
                 )
             )
         }
 
         return rows
+    }
+
+    private func protectedProcessPIDs(
+        in rows: [ProcRow]
+    ) -> Set<pid_t> {
+        let processByPID = Dictionary(
+            uniqueKeysWithValues: rows.map {
+                ($0.pid, $0)
+            }
+        )
+
+        var protected = Set<pid_t>()
+        var currentPID = getpid()
+
+        while currentPID > 0 {
+            guard protected.insert(currentPID).inserted else {
+                break
+            }
+
+            guard let row = processByPID[currentPID] else {
+                break
+            }
+
+            currentPID = row.ppid
+        }
+
+        return protected
     }
 
     private func makeChildrenByParent(
@@ -289,12 +387,17 @@ public struct SwiftPMProcesses: Sendable {
 
     private func orderedProcessTreePIDs(
         roots: [pid_t],
-        childrenByParent: [pid_t: [pid_t]]
+        childrenByParent: [pid_t: [pid_t]],
+        excluding excludedPIDs: Set<pid_t>
     ) -> [pid_t] {
         var visited = Set<pid_t>()
         var ordered: [pid_t] = []
 
         func appendTree(_ pid: pid_t) {
+            guard !excludedPIDs.contains(pid) else {
+                return
+            }
+
             guard visited.insert(pid).inserted else {
                 return
             }
@@ -311,6 +414,34 @@ public struct SwiftPMProcesses: Sendable {
         }
 
         return ordered
+    }
+
+    private func waitForTermination(
+        _ pids: [pid_t],
+        timeoutNanoseconds: UInt64
+    ) async throws -> [pid_t] {
+        let start = DispatchTime.now().uptimeNanoseconds
+
+        while true {
+            try Task.checkCancellation()
+
+            let survivors = pids.filter(isAlive)
+
+            if survivors.isEmpty {
+                return []
+            }
+
+            let elapsed =
+                DispatchTime.now().uptimeNanoseconds - start
+
+            if elapsed >= timeoutNanoseconds {
+                return survivors
+            }
+
+            try await Task.sleep(
+                nanoseconds: Self.pollingIntervalNanoseconds
+            )
+        }
     }
 
     private func signal(
@@ -342,6 +473,7 @@ public struct SwiftPMProcesses: Sendable {
             }
 
             let command = processByPID[pid]?.command ?? "<unknown>"
+
             printi(
                 "Sent \(signalName) to pid \(pid) – \(command)"
             )
@@ -381,19 +513,30 @@ public struct SwiftPMProcesses: Sendable {
                 .last ?? executableToken
         )
 
+        if executableName == "env" {
+            guard tokens.count >= 3 else {
+                return false
+            }
+
+            let commandName = String(
+                tokens[1]
+                    .split(separator: "/")
+                    .last ?? tokens[1]
+            )
+
+            guard commandName == "swift" else {
+                return false
+            }
+
+            return isSwiftSubcommand(tokens[2])
+        }
+
         if executableName == "swift" {
             guard tokens.count >= 2 else {
                 return false
             }
 
-            let subcommand = tokens[1].lowercased()
-
-            return [
-                "build",
-                "package",
-                "run",
-                "test"
-            ].contains(subcommand)
+            return isSwiftSubcommand(tokens[1])
         }
 
         return [
@@ -402,5 +545,16 @@ public struct SwiftPMProcesses: Sendable {
             "swift-run",
             "swift-test"
         ].contains(executableName)
+    }
+
+    private static func isSwiftSubcommand(
+        _ token: Substring
+    ) -> Bool {
+        [
+            "build",
+            "package",
+            "run",
+            "test"
+        ].contains(token.lowercased())
     }
 }
