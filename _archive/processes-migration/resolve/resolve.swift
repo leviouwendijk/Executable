@@ -1,6 +1,5 @@
 import Foundation
 import Interfaces
-import Processes
 // import plate
 import Terminal
 
@@ -63,56 +62,26 @@ public enum Resolve {
         let painter: @Sendable (String) -> String = { $0.paint(colorables) }
         let streamer = LineStreamer(handle: .standardOutput, colorize: true, paint: painter)
 
-        let processResult = try await ProcessRunner().run(
-            .init(
-                executable: .path(
-                    "/usr/bin/env"
-                ),
-                arguments: [
-                    "swift",
-                    "package",
-                    subcommand,
-                ],
-                workingDirectory: dir,
-                environment: .inheritedUpdating(
-                    [
-                        "NSUnbufferedIO": "YES",
-                    ]
-                ),
-                io: .pseudoTerminal,
-                outputLimit: .max
-            ),
-            onStdout: { chunk in
-                await streamer.ingest(
-                    chunk
-                )
+        var childEnv = ProcessInfo.processInfo.environment
+        childEnv["NSUnbufferedIO"] = "YES"
+
+        let res = try runPTY(
+            "/usr/bin/env",
+            ["swift", "package", subcommand],
+            env: childEnv,
+            cwd: dir,
+            onChunk: { chunk in
+                Task.detached { await streamer.ingest(chunk) }
             }
         )
 
         await streamer.flush()
 
-        let code: Int32
-
-        switch processResult.exit {
-        case .exited(let value):
-            code = value
-
-        case .signaled(let signal):
-            code =
-                128
-                + signal
+        if res.exitCode != 0 {
+            // surface whatever we captured (PTY merges streams)
+            let out = String(data: res.stdout, encoding: .utf8) ?? ""
+            throw BuildError.invocationFailed(message: out) // reuse existing pretty error
         }
-
-        if code != 0 {
-            throw BuildError.invocationFailed(
-                message: processResult.stdoutText
-            )
-        }
-
-        return .init(
-            exitCode: code,
-            stdout: processResult.stdout,
-            stderr: Data()
-        )
+        return .init(exitCode: res.exitCode, stdout: res.stdout, stderr: Data())
     }
 }

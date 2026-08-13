@@ -1,7 +1,6 @@
 import Foundation
 import plate
 import Interfaces
-import Processes
 import Terminal
 import Indentation
 
@@ -64,24 +63,16 @@ public enum Build {
 
     @discardableResult
     private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
-        let processResult = try await ProcessRunner().run(
-            .init(
-                executable: .path(
-                    "/usr/bin/env"
-                ),
-                arguments: [
-                    "swift",
-                ] + command,
-                workingDirectory: dir,
-                environment: .inheritedUpdating(
-                    [
-                        "NSUnbufferedIO": "YES",
-                    ]
-                ),
-                io: .pseudoTerminal,
-                outputLimit: .max
-            ),
-            onStdout: { chunk in
+        var childEnv = ProcessInfo.processInfo.environment
+        childEnv["NSUnbufferedIO"] = "YES"
+
+        let resPTY = try runPTY(
+            "/usr/bin/env",
+            ["swift"] + command,
+            env: childEnv,
+            cwd: dir,
+            onChunk: { chunk in
+                // favor direct passthrough over live painting, for now
                 Terminal.write(
                     chunk,
                     to: .standardOutput
@@ -89,42 +80,22 @@ public enum Build {
             }
         )
 
-        let code: Int32
-
-        switch processResult.exit {
-        case .exited(let value):
-            code = value
-
-        case .signaled(let signal):
-            code =
-                128
-                + signal
-        }
-
+        let code = resPTY.exitCode
         if code != 0 {
-            throw BuildError.swiftFailed(
-                exitCode: Int(
-                    code
-                ),
-                stdout: processResult.stdoutText,
-                stderr: ""
-            )
+            let out = String(data: resPTY.stdout, encoding: .utf8) ?? ""
+            throw BuildError.swiftFailed(exitCode: Int(code), stdout: out, stderr: "")
         }
 
-        let mode: Config.Mode = command.contains {
-            $0.lowercased() == "debug"
-        }
+        let mode: Config.Mode = command.contains { $0.lowercased() == "debug" }
             ? .debug
             : .release
 
         return BuildResult(
             exitCode: code,
-            stdout: processResult.stdout,
+            stdout: resPTY.stdout,
             stderr: Data(),
             mode: mode,
-            buildDirComponent: mode == .debug
-                ? "debug"
-                : "release"
+            buildDirComponent: mode == .debug ? "debug" : "release"
         )
     }
 

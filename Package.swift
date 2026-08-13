@@ -13,10 +13,14 @@ let package = Package(
             name: "Executable",
             targets: ["Executable"]
         ),
+        .executable(
+            name: "etest",
+            targets: ["ExecutableTestFlows"]
+        ),
     ],
     dependencies: [
         .package(
-            url: "https://github.com/leviouwendijk/plate.git", // ansi and things
+            url: "https://github.com/leviouwendijk/plate.git",
             branch: "master"
         ),
         .package(
@@ -35,6 +39,14 @@ let package = Package(
             url: "https://github.com/leviouwendijk/Path.git",
             branch: "master"
         ),
+        .package(
+            url: "https://github.com/leviouwendijk/Processes.git",
+            branch: "master"
+        ),
+        .package(
+            url: "https://github.com/leviouwendijk/TestFlows.git",
+            branch: "master"
+        ),
     ],
     targets: [
         .target(
@@ -42,10 +54,21 @@ let package = Package(
             dependencies: [
                 .product(name: "plate", package: "plate"),
                 .product(name: "Interfaces", package: "Interfaces"),
+                .product(name: "Processes", package: "Processes"),
                 .product(name: "Terminal", package: "Terminal"),
                 .product(name: "Indentation", package: "Indentation"),
                 .product(name: "Path", package: "Path"),
-            ],
+            ]
+        ),
+        .executableTarget(
+            name: "ExecutableTestFlows",
+            dependencies: [
+                "Executable",
+                .product(
+                    name: "TestFlows",
+                    package: "TestFlows"
+                ),
+            ]
         ),
     ]
 )

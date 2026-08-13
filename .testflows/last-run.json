@@ -1,0 +1,48 @@
+{
+  "failed" : 0,
+  "failed_names" : [
+
+  ],
+  "generated_at" : "2026-08-13T16:15:50Z",
+  "passed" : 3,
+  "results" : [
+    {
+      "display_name" : "targets",
+      "duration_seconds" : 2.222064971923828,
+      "name" : "targets",
+      "status" : "passed",
+      "tags" : [
+        "regression",
+        "swiftpm",
+        "targets"
+      ]
+    },
+    {
+      "display_name" : "resolve",
+      "duration_seconds" : 1.4160969257354736,
+      "name" : "resolve",
+      "status" : "passed",
+      "tags" : [
+        "pty",
+        "regression",
+        "resolve",
+        "swiftpm"
+      ]
+    },
+    {
+      "display_name" : "build",
+      "duration_seconds" : 55.98413896560669,
+      "name" : "build",
+      "status" : "passed",
+      "tags" : [
+        "build",
+        "pty",
+        "regression",
+        "swiftpm"
+      ]
+    }
+  ],
+  "skipped" : 0,
+  "title" : "Executable flow tests",
+  "total" : 3
+}
