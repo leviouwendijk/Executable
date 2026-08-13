@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-13T16:15:50Z",
-  "passed" : 3,
+  "generated_at" : "2026-08-13T18:42:50Z",
+  "passed" : 5,
   "results" : [
     {
       "display_name" : "targets",
-      "duration_seconds" : 2.222064971923828,
+      "duration_seconds" : 2.2278980016708374,
       "name" : "targets",
       "status" : "passed",
       "tags" : [
@@ -19,7 +19,7 @@
     },
     {
       "display_name" : "resolve",
-      "duration_seconds" : 1.4160969257354736,
+      "duration_seconds" : 1.6150239706039429,
       "name" : "resolve",
       "status" : "passed",
       "tags" : [
@@ -30,8 +30,31 @@
       ]
     },
     {
+      "display_name" : "build-library",
+      "duration_seconds" : 22.00994300842285,
+      "name" : "build-library",
+      "status" : "passed",
+      "tags" : [
+        "build-library",
+        "pipes",
+        "regression",
+        "swiftpm"
+      ]
+    },
+    {
+      "display_name" : "process-evaluator",
+      "duration_seconds" : 0.03613901138305664,
+      "name" : "process-evaluator",
+      "status" : "passed",
+      "tags" : [
+        "process",
+        "regression",
+        "relaunch"
+      ]
+    },
+    {
       "display_name" : "build",
-      "duration_seconds" : 55.98413896560669,
+      "duration_seconds" : 20.021830916404724,
       "name" : "build",
       "status" : "passed",
       "tags" : [
@@ -44,5 +67,5 @@
   ],
   "skipped" : 0,
   "title" : "Executable flow tests",
-  "total" : 3
+  "total" : 5
 }

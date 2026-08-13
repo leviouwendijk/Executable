@@ -7,6 +7,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         targetsFlow,
         resolveFlow,
         buildLibraryFlow,
+        processEvaluatorFlow,
         buildFlow,
     ]
 }
