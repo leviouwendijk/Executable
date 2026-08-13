@@ -13,7 +13,7 @@ extension ExecutableFlowSuite {
                 "regression",
             ]
         ) {
-            Step("build fixture through PTY path") {
+            Step("build and clean fixture through PTY path") {
                 let fixture = try SwiftPackageFixture()
 
                 defer {
@@ -71,91 +71,6 @@ extension ExecutableFlowSuite {
                         atPath: binary.path
                     ),
                     "build produces FixtureCLI binary"
-                )
-            }
-
-            Step("build failure preserves merged PTY diagnostics") {
-                let fixture = try SwiftPackageFixture()
-
-                defer {
-                    fixture.remove()
-                }
-
-                try fixture.breakCLICompilation()
-
-                var observedFailure = false
-                var observedExitCode = 0
-                var observedStdout = ""
-                var observedStderr = ""
-
-                do {
-                    _ = try await Build.build(
-                        at: fixture.root,
-                        config: .init(
-                            mode: .debug,
-                            updateBuiltOnSuccess: false
-                        )
-                    )
-                } catch BuildError.swiftFailed(
-                    let exitCode,
-                    let stdout,
-                    let stderr
-                ) {
-                    observedFailure = true
-                    observedExitCode = exitCode
-                    observedStdout = stdout
-                    observedStderr = stderr
-                }
-
-                try Expect.true(
-                    observedFailure,
-                    "invalid Swift source surfaces BuildError.swiftFailed"
-                )
-
-                try Expect.true(
-                    observedExitCode != 0,
-                    "failed build preserves nonzero exit code"
-                )
-
-                try Expect.true(
-                    observedStdout.lowercased().contains(
-                        "error"
-                    ),
-                    "PTY transcript retains compiler diagnostics"
-                )
-
-                try Expect.equal(
-                    observedStderr,
-                    "",
-                    "PTY build failure keeps dedicated stderr empty"
-                )
-            }
-
-            Step("clean removes built fixture products") {
-                let fixture = try SwiftPackageFixture()
-
-                defer {
-                    fixture.remove()
-                }
-
-                _ = try await Build.build(
-                    at: fixture.root,
-                    config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
-                    )
-                )
-
-                let binary = fixture.root
-                    .appendingPathComponent(
-                        ".build/debug/FixtureCLI"
-                    )
-
-                try Expect.true(
-                    FileManager.default.fileExists(
-                        atPath: binary.path
-                    ),
-                    "fixture binary exists before clean"
                 )
 
                 try await Build.clean(

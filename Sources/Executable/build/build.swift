@@ -63,7 +63,7 @@ public enum Build {
     }
 
     @discardableResult
-    private static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
+    package static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
         let processResult = try await ProcessRunner().run(
             .init(
                 executable: .path(

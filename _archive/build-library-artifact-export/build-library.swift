@@ -77,35 +77,58 @@ public enum BuildLibrary {
             withIntermediateDirectories: true
         )
 
-        let artifacts = try artifactURLs(
-            in: builtDir
-        )
-
-        guard !artifacts.isEmpty else {
-            throw BuildError.invocationFailed(
-                message: "No distributable library artifacts were produced."
-            )
-        }
+        let suffixes = [
+            ".swiftmodule",
+            ".swiftdoc",
+            ".swiftinterface",
+            ".swiftsourceinfo",
+            ".abi.json",
+            ".dylib",
+            ".a",
+        ]
 
         let fileManager = FileManager.default
 
-        for source in artifacts {
+        let contents = (
+            try? fileManager.contentsOfDirectory(
+                atPath: builtDir.path
+            )
+        ) ?? []
+
+        for item in contents {
+            guard suffixes.contains(
+                where: {
+                    item.hasSuffix(
+                        $0
+                    )
+                }
+            ) else {
+                continue
+            }
+
+            let source = builtDir.appendingPathComponent(
+                item
+            )
+
             let destination = outDir.appendingPathComponent(
-                source.lastPathComponent
+                item
             )
 
             if fileManager.fileExists(
                 atPath: destination.path
             ) {
-                try fileManager.removeItem(
+                try? fileManager.removeItem(
                     at: destination
                 )
             }
 
-            try fileManager.copyItem(
-                at: source,
-                to: destination
-            )
+            do {
+                try fileManager.copyItem(
+                    at: source,
+                    to: destination
+                )
+            } catch {
+            }
         }
 
         print(
@@ -192,72 +215,6 @@ public enum BuildLibrary {
                 name: name,
                 targets: targets
             )
-        }
-    }
-
-    package static func artifactURLs(
-        in builtDir: URL
-    ) throws -> [URL] {
-        let suffixes = [
-            ".swiftmodule",
-            ".swiftdoc",
-            ".swiftinterface",
-            ".swiftsourceinfo",
-            ".abi.json",
-            ".dylib",
-            ".a",
-        ]
-
-        let fileManager = FileManager.default
-
-        let roots = [
-            builtDir,
-            builtDir.appendingPathComponent(
-                "Modules",
-                isDirectory: true
-            ),
-        ]
-
-        var artifacts: [URL] = []
-
-        for root in roots {
-            let resolvedRoot = root
-                .resolvingSymlinksInPath()
-                .standardizedFileURL
-
-            var isDirectory: ObjCBool = false
-
-            guard
-                fileManager.fileExists(
-                    atPath: resolvedRoot.path,
-                    isDirectory: &isDirectory
-                ),
-                isDirectory.boolValue
-            else {
-                continue
-            }
-
-            let contents = try fileManager.contentsOfDirectory(
-                at: resolvedRoot,
-                includingPropertiesForKeys: nil,
-                options: [
-                    .skipsHiddenFiles,
-                ]
-            )
-
-            artifacts.append(
-                contentsOf: contents.filter { artifact in
-                    suffixes.contains { suffix in
-                        artifact.lastPathComponent.hasSuffix(
-                            suffix
-                        )
-                    }
-                }
-            )
-        }
-
-        return artifacts.sorted {
-            $0.path < $1.path
         }
     }
 

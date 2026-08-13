@@ -221,15 +221,11 @@ public enum BuildLibrary {
         var artifacts: [URL] = []
 
         for root in roots {
-            let resolvedRoot = root
-                .resolvingSymlinksInPath()
-                .standardizedFileURL
-
             var isDirectory: ObjCBool = false
 
             guard
                 fileManager.fileExists(
-                    atPath: resolvedRoot.path,
+                    atPath: root.path,
                     isDirectory: &isDirectory
                 ),
                 isDirectory.boolValue
@@ -238,7 +234,7 @@ public enum BuildLibrary {
             }
 
             let contents = try fileManager.contentsOfDirectory(
-                at: resolvedRoot,
+                at: root,
                 includingPropertiesForKeys: nil,
                 options: [
                     .skipsHiddenFiles,
