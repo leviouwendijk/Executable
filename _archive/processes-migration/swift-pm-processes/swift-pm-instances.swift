@@ -1,7 +1,6 @@
 import Darwin
 import Foundation
 import Indentation
-import Processes
 
 public struct SwiftPMProcess: Sendable, Hashable {
     public let pid: pid_t
@@ -65,7 +64,7 @@ public struct SwiftPMProcesses: Sendable {
     public func list(
         cwd _: URL? = nil
     ) async throws -> [SwiftPMProcess] {
-        let rows = try await snapshot()
+        let rows = try snapshot()
         let excludedPIDs = protectedProcessPIDs(in: rows)
 
         return rows.compactMap { row in
@@ -90,7 +89,7 @@ public struct SwiftPMProcesses: Sendable {
         dryRun: Bool = false,
         cwd _: URL? = nil
     ) async throws -> [SwiftPMProcess] {
-        let rows = try await snapshot()
+        let rows = try snapshot()
         let excludedPIDs = protectedProcessPIDs(in: rows)
 
         let matchedRoots = rows.filter { row in
@@ -215,64 +214,100 @@ public struct SwiftPMProcesses: Sendable {
         return matchedProcesses
     }
 
-    private func snapshot() async throws -> [ProcRow] {
-        let result = try await ProcessRunner().run(
-            .init(
-                executable: .path(
-                    "/bin/ps"
-                ),
-                arguments: [
-                    "ax",
-                    "-o",
-                    "pid=,ppid=,command=",
-                ],
-                io: .pipes,
-                outputLimit: .max
-            )
-        )
+    private func snapshot() throws -> [ProcRow] {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
 
-        switch result.exit {
-        case .exited(0):
-            break
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = [
+            "ax",
+            "-o",
+            "pid=,ppid=,command="
+        ]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
 
-        case .exited(
-            let code
-        ):
+        let stdoutLock = NSLock()
+        let stderrLock = NSLock()
+
+        nonisolated(unsafe) var stdoutData = Data()
+        nonisolated(unsafe) var stderrData = Data()
+
+        stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+
+            guard !data.isEmpty else {
+                return
+            }
+
+            stdoutLock.lock()
+            stdoutData.append(data)
+            stdoutLock.unlock()
+        }
+
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+
+            guard !data.isEmpty else {
+                return
+            }
+
+            stderrLock.lock()
+            stderrData.append(data)
+            stderrLock.unlock()
+        }
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            throw error
+        }
+
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+
+        let remainingStdout =
+            stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+
+        let remainingStderr =
+            stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        stdoutLock.lock()
+        stdoutData.append(remainingStdout)
+        let capturedStdout = stdoutData
+        stdoutLock.unlock()
+
+        stderrLock.lock()
+        stderrData.append(remainingStderr)
+        let capturedStderr = stderrData
+        stderrLock.unlock()
+
+        guard process.terminationStatus == 0 else {
             throw SwiftPMProcessError.processSnapshotFailed(
-                exitCode: code,
+                exitCode: process.terminationStatus,
                 stderr: String(
-                    data: result.stderr,
-                    encoding: .utf8
-                ) ?? ""
-            )
-
-        case .signaled(
-            let signal
-        ):
-            throw SwiftPMProcessError.processSnapshotFailed(
-                exitCode: signal,
-                stderr: String(
-                    data: result.stderr,
+                    data: capturedStderr,
                     encoding: .utf8
                 ) ?? ""
             )
         }
 
         guard let text = String(
-            data: result.stdout,
+            data: capturedStdout,
             encoding: .utf8
         ) else {
             throw SwiftPMProcessError.processSnapshotUnreadable
         }
 
         var rows: [ProcRow] = []
-        rows.reserveCapacity(
-            256
-        )
+        rows.reserveCapacity(256)
 
-        for rawLine in text.split(
-            whereSeparator: \.isNewline
-        ) {
+        for rawLine in text.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(
                 in: .whitespaces
             )
@@ -284,34 +319,23 @@ public struct SwiftPMProcesses: Sendable {
             let parts = line.split(
                 maxSplits: 2,
                 whereSeparator: {
-                    $0 == " "
-                    || $0 == "\t"
+                    $0 == " " || $0 == "\t"
                 }
             )
 
             guard
                 parts.count == 3,
-                let pidValue = Int32(
-                    parts[0]
-                ),
-                let parentPIDValue = Int32(
-                    parts[1]
-                )
+                let pidValue = Int32(parts[0]),
+                let parentPIDValue = Int32(parts[1])
             else {
                 continue
             }
 
             rows.append(
                 ProcRow(
-                    pid: pid_t(
-                        pidValue
-                    ),
-                    ppid: pid_t(
-                        parentPIDValue
-                    ),
-                    command: String(
-                        parts[2]
-                    )
+                    pid: pid_t(pidValue),
+                    ppid: pid_t(parentPIDValue),
+                    command: String(parts[2])
                 )
             )
         }
