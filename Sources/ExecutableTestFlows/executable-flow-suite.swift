@@ -9,6 +9,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         buildLibraryFlow,
         processEvaluatorFlow,
         swiftPMProcessesFlow,
+        objectRenewerFlow,
         buildFlow,
     ]
 }

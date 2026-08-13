@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-13T18:50:15Z",
-  "passed" : 6,
+  "generated_at" : "2026-08-13T18:56:26Z",
+  "passed" : 7,
   "results" : [
     {
       "display_name" : "targets",
-      "duration_seconds" : 2.134986996650696,
+      "duration_seconds" : 2.14206600189209,
       "name" : "targets",
       "status" : "passed",
       "tags" : [
@@ -19,7 +19,7 @@
     },
     {
       "display_name" : "resolve",
-      "duration_seconds" : 1.410275936126709,
+      "duration_seconds" : 1.450829029083252,
       "name" : "resolve",
       "status" : "passed",
       "tags" : [
@@ -31,7 +31,7 @@
     },
     {
       "display_name" : "build-library",
-      "duration_seconds" : 21.82249903678894,
+      "duration_seconds" : 23.21749496459961,
       "name" : "build-library",
       "status" : "passed",
       "tags" : [
@@ -43,7 +43,7 @@
     },
     {
       "display_name" : "process-evaluator",
-      "duration_seconds" : 0.037409067153930664,
+      "duration_seconds" : 0.03640902042388916,
       "name" : "process-evaluator",
       "status" : "passed",
       "tags" : [
@@ -54,7 +54,7 @@
     },
     {
       "display_name" : "swiftpm-processes",
-      "duration_seconds" : 0.053341031074523926,
+      "duration_seconds" : 0.052240967750549316,
       "name" : "swiftpm-processes",
       "status" : "passed",
       "tags" : [
@@ -65,8 +65,19 @@
       ]
     },
     {
+      "display_name" : "object-renewer",
+      "duration_seconds" : 0.012736916542053223,
+      "name" : "object-renewer",
+      "status" : "passed",
+      "tags" : [
+        "object-renewer",
+        "process",
+        "regression"
+      ]
+    },
+    {
       "display_name" : "build",
-      "duration_seconds" : 19.82033896446228,
+      "duration_seconds" : 20.587366938591003,
       "name" : "build",
       "status" : "passed",
       "tags" : [
@@ -79,5 +90,5 @@
   ],
   "skipped" : 0,
   "title" : "Executable flow tests",
-  "total" : 6
+  "total" : 7
 }

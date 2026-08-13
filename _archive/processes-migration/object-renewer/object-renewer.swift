@@ -1,7 +1,6 @@
 import Foundation
 import Interfaces
 import plate
-import Processes
 import Terminal
 import Indentation
 
@@ -210,187 +209,25 @@ public struct ObjectRenewer: Sendable {
     }
 
     public static func execute(in dirURL: URL) async throws {
+        // execute `sbm` (no args) –- specify build defaults in build-object.pkl
         let bin = "sbm"
+        let cmdPreview = (["/usr/bin/env", bin]).map {
+            $0.isEmpty ? "''" : "'" + $0.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+        }.joined(separator: " ")
 
-        let cmdPreview = (
-            [
-                "/usr/bin/env",
-                bin,
-            ]
-        )
-        .map {
-            $0.isEmpty
-                ? "''"
-                : "'"
-                    + $0.replacingOccurrences(
-                        of: "'",
-                        with: "'\"'\"'"
-                    )
-                    + "'"
-        }
-        .joined(
-            separator: " "
-        )
+        printi("→ \(cmdPreview)")
 
-        printi(
-            "→ \(cmdPreview)"
-        )
+        let res = try await sh(.zsh, bin, [], cwd: dirURL)
 
-        let duration = try await executeCommand(
-            in: dirURL,
-            launchPath: "/bin/zsh",
-            arguments: [
-                "-lc",
-                "/usr/bin/env sbm",
-            ],
-            displayName: bin,
-            teeOutput: true
-        )
-
-        let components = duration.components
-
-        let seconds =
-            Double(
-                components.seconds
-            )
-            + Double(
-                components.attoseconds
-            )
-            / 1_000_000_000_000_000_000
-
-        let summary =
-            "✓ exit=0  time="
-            + String(
-                format: "%.3fs",
-                seconds
-            )
-
-        let ok =
-            "Compile: "
-            + "Ok".ansi(
-                .green,
-                .bold
-            )
-            + " "
-            + summary
-
-        let div = String(
-            repeating: "-",
-            count: 50 - 16
-        )
-
-        printi(
-            div
-        )
-
-        printi(
-            ok
-        )
-
-        printi(
-            div
-        )
-    }
-
-    @discardableResult
-    package static func executeCommand(
-        in dirURL: URL,
-        launchPath: String,
-        arguments: [String],
-        displayName: String,
-        teeOutput: Bool
-    ) async throws -> Duration {
-        let stdoutHandler: ProcessOutputHandler?
-        let stderrHandler: ProcessOutputHandler?
-
-        if teeOutput {
-            stdoutHandler = { chunk in
-                Terminal.write(
-                    chunk,
-                    to: .standardOutput
-                )
-            }
-
-            stderrHandler = { chunk in
-                Terminal.write(
-                    chunk,
-                    to: .standardError
-                )
-            }
-        } else {
-            stdoutHandler = nil
-            stderrHandler = nil
+        if let code = res.exitCode, code != 0 {
+            throw ObjectRenewerError.cannotCompile(dirURL, "\(bin) exited with \(code)\n\(res.stderrText())")
         }
 
-        let clock = ContinuousClock()
-        let started = clock.now
-
-        let result = try await ProcessRunner().run(
-            .init(
-                executable: .path(
-                    launchPath
-                ),
-                arguments: arguments,
-                workingDirectory: dirURL,
-                io: .pipes,
-                outputLimit: .max
-            ),
-            onStdout: stdoutHandler,
-            onStderr: stderrHandler
-        )
-
-        let duration = started.duration(
-            to: clock.now
-        )
-
-        switch result.exit {
-        case .exited(0):
-            return duration
-
-        case .exited(
-            let code
-        ):
-            throw ObjectRenewerError.cannotCompile(
-                dirURL,
-                compileFailureMessage(
-                    displayName: displayName,
-                    reason: "exited with \(code)",
-                    stderr: result.stderr
-                )
-            )
-
-        case .signaled(
-            let signal
-        ):
-            throw ObjectRenewerError.cannotCompile(
-                dirURL,
-                compileFailureMessage(
-                    displayName: displayName,
-                    reason: "terminated by signal \(signal)",
-                    stderr: result.stderr
-                )
-            )
-        }
-    }
-
-    private static func compileFailureMessage(
-        displayName: String,
-        reason: String,
-        stderr: Data
-    ) -> String {
-        let stderrText = String(
-            data: stderr,
-            encoding: .utf8
-        ) ?? String(
-            decoding: stderr,
-            as: UTF8.self
-        )
-
-        guard !stderrText.isEmpty else {
-            return "\(displayName) \(reason)"
-        }
-
-        return "\(displayName) \(reason)\n\(stderrText)"
+        let ok  = "Compile: " + "Ok".ansi(.green, .bold) + " " + res.shortSummary
+        let div = String(repeating: "-", count: (50 - 16))
+        printi(div)
+        printi(ok)
+        printi(div)
     }
 }
 
