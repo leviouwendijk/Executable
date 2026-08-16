@@ -67,10 +67,6 @@ private extension SwiftPackageFixture {
                         name: "FixtureApp",
                         targets: ["FixtureApp"]
                     ),
-                    .executable(
-                        name: "Worker",
-                        targets: ["Worker"]
-                    ),
                 ],
                 targets: [
                     .target(

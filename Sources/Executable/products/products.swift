@@ -17,7 +17,7 @@ public enum Products {
             blob: blob
         )
 
-        let products = reader
+        let explicitProducts = reader
             .allProducts()
             .compactMap {
                 product -> ExecutableProduct? in
@@ -40,6 +40,34 @@ public enum Products {
                     targets: targets
                 )
             }
+
+        let explicitlyCoveredTargets = Set(
+            explicitProducts.flatMap(
+                \.targets
+            )
+        )
+
+        let implicitProducts = reader
+            .executableTargetNames()
+            .filter {
+                !explicitlyCoveredTargets.contains(
+                    $0
+                )
+            }
+            .map {
+                targetName in
+
+                ExecutableProduct(
+                    name: targetName,
+                    targets: [
+                        targetName,
+                    ]
+                )
+            }
+
+        let products =
+            explicitProducts
+            + implicitProducts
 
         guard !products.isEmpty else {
             throw ProductsError.noExecutableProductsFound

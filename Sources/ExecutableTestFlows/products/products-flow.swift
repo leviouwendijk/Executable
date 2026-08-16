@@ -69,6 +69,22 @@ extension ExecutableFlowSuite {
                     },
                     "target name is not exposed as executable product name"
                 )
+
+                guard let worker = products.first(
+                    where: {
+                        $0.name == "Worker"
+                    }
+                ) else {
+                    throw ProductsFlowError.missingImplicitWorkerProduct
+                }
+
+                try Expect.equal(
+                    worker.targets,
+                    [
+                        "Worker",
+                    ],
+                    "uncovered executable target becomes implicit product"
+                )
             }
 
             Step(
@@ -191,4 +207,5 @@ private enum ProductsFlowError:
     Error
 {
     case missingFixtureCLIProduct
+    case missingImplicitWorkerProduct
 }

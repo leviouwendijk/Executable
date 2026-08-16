@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-16T00:50:11Z",
+  "generated_at" : "2026-08-16T00:58:12Z",
   "passed" : 8,
   "results" : [
     {
       "display_name" : "targets",
-      "duration_seconds" : 2.1757659912109375,
+      "duration_seconds" : 2.023386001586914,
       "name" : "targets",
       "status" : "passed",
       "tags" : [
@@ -19,7 +19,7 @@
     },
     {
       "display_name" : "products",
-      "duration_seconds" : 36.40983200073242,
+      "duration_seconds" : 34.82741606235504,
       "name" : "products",
       "status" : "passed",
       "tags" : [
@@ -31,7 +31,7 @@
     },
     {
       "display_name" : "resolve",
-      "duration_seconds" : 1.8514350652694702,
+      "duration_seconds" : 1.3857660293579102,
       "name" : "resolve",
       "status" : "passed",
       "tags" : [
@@ -43,7 +43,7 @@
     },
     {
       "display_name" : "build-library",
-      "duration_seconds" : 20.46990191936493,
+      "duration_seconds" : 21.022876024246216,
       "name" : "build-library",
       "status" : "passed",
       "tags" : [
@@ -55,7 +55,7 @@
     },
     {
       "display_name" : "process-evaluator",
-      "duration_seconds" : 0.03994596004486084,
+      "duration_seconds" : 0.039512038230895996,
       "name" : "process-evaluator",
       "status" : "passed",
       "tags" : [
@@ -66,7 +66,7 @@
     },
     {
       "display_name" : "swiftpm-processes",
-      "duration_seconds" : 0.034947991371154785,
+      "duration_seconds" : 0.03161203861236572,
       "name" : "swiftpm-processes",
       "status" : "passed",
       "tags" : [
@@ -78,7 +78,7 @@
     },
     {
       "display_name" : "object-renewer",
-      "duration_seconds" : 0.016883015632629395,
+      "duration_seconds" : 0.010261058807373047,
       "name" : "object-renewer",
       "status" : "passed",
       "tags" : [
@@ -89,7 +89,7 @@
     },
     {
       "display_name" : "build",
-      "duration_seconds" : 17.25334405899048,
+      "duration_seconds" : 18.31075394153595,
       "name" : "build",
       "status" : "passed",
       "tags" : [
