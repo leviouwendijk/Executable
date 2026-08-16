@@ -1,5 +1,4 @@
 import Foundation
-// import plate
 import Path
 
 public enum Deploy {
@@ -10,11 +9,17 @@ public enum Deploy {
         config: Build.Config,
         to defaultDestination: URL
     ) async throws {
-        try ensureDir(defaultDestination)
-        let names = try await Targets.executableNames(in: projectDir)
-        for n in names {
+        try ensureDir(
+            defaultDestination
+        )
+
+        let products = try await Products.executables(
+            in: projectDir
+        )
+
+        for product in products {
             try moveOne(
-                targetName: n,
+                productName: product.name,
                 from: projectDir,
                 config: config,
                 to: defaultDestination
@@ -26,78 +31,192 @@ public enum Deploy {
         from projectDir: URL,
         config: Build.Config,
         to defaultDestination: URL,
-        targets: [String],
-        perTargetDestinations: [String: URL] = [:]
+        products: [String],
+        perProductDestinations: [String: URL] = [:]
     ) throws {
-        try ensureDir(defaultDestination)
-        for n in targets {
-            let dest = perTargetDestinations[n] ?? defaultDestination
-            try ensureDir(dest)
-            try moveOne(targetName: n, from: projectDir, config: config, to: dest)
+        try ensureDir(
+            defaultDestination
+        )
+
+        for productName in products {
+            let destination =
+                perProductDestinations[productName]
+                ?? defaultDestination
+
+            try ensureDir(
+                destination
+            )
+
+            try moveOne(
+                productName: productName,
+                from: projectDir,
+                config: config,
+                to: destination
+            )
         }
     }
 
+    @available(
+        *,
+        deprecated,
+        message: """
+        Executable deployment is product-based. \
+        Use selected(..., products:perProductDestinations:).
+        """
+    )
+    public static func selected(
+        from projectDir: URL,
+        config: Build.Config,
+        to defaultDestination: URL,
+        targets: [String],
+        perTargetDestinations: [String: URL] = [:]
+    ) throws {
+        try selected(
+            from: projectDir,
+            config: config,
+            to: defaultDestination,
+            products: targets,
+            perProductDestinations: perTargetDestinations
+        )
+    }
+
     private static func moveOne(
-        targetName: String,
+        productName: String,
         from projectDir: URL,
         config: Build.Config,
         to destinationRoot: URL
     ) throws {
-        // let buildDir = projectDir.appendingPathComponent(".build/\(config.buildDirComponent)")
-        // let sourceURL = buildDir.appendingPathComponent(targetName)
         let sourceURL = resolvedBuildProductURL(
-            targetName: targetName,
+            productName: productName,
             from: projectDir,
             config: config
         )
-        let destinationURL = destinationRoot.appendingPathComponent(targetName)
 
-        guard FileManager.default.fileExists(atPath: sourceURL.path) else {
-            throw DeployError.sourceMissing(sourceURL)
-        }
+        let destinationURL = destinationRoot
+            .appendingPathComponent(
+                productName
+            )
 
-        print("")
-        print("Deploying ".ansi(.brightBlack) + targetName.ansi(.bold) + " → \(destinationRoot.path)".ansi(.brightBlack))
-
-        let fm = FileManager.default
-        var existed = false
-        do {
-            if fm.fileExists(atPath: destinationURL.path) {
-                existed = true
-                print("\(destinationURL.path)".ansi(.brightBlack, .bold) + " exists — replacing...".ansi(.brightBlack))
-            }
-            if let replaced = try fm.replaceItemAt(destinationURL, withItemAt: sourceURL) {
-                print("Binary ".ansi(.brightBlack) + (existed ? "re".ansi(.brightBlack) : "") +
-                      "placed at ".ansi(.brightBlack) + replaced.path.ansi(.bold, .brightBlack))
-            } else {
-                print("Binary replaced, but no new URL was returned.".ansi(.yellow))
-            }
-        } catch {
-            throw DeployError.replaceFailed(src: sourceURL, dst: destinationURL, underlying: error.localizedDescription)
-        }
-
-        do {
-            try writeMetadata(for: targetName, projectDir: projectDir, config: config, destinationRoot: destinationRoot)
-        } catch {
-            print(
-                DeployError.metadataWriteFailed(
-                    destinationRoot.appendingPathComponent("\(targetName).metadata"),
-                    underlying: error.localizedDescription
-                ).formatted()
+        guard FileManager.default.fileExists(
+            atPath: sourceURL.path
+        ) else {
+            throw DeployError.sourceMissing(
+                sourceURL
             )
         }
 
-        let banner = "\n        \(targetName) ".ansi(.bold) + "is now an executable binary for " + projectDir.lastPathComponent.ansi(.italic) + "\n    "
-        print(banner)
+        print("")
+
+        print(
+            "Deploying ".ansi(.brightBlack)
+            + productName.ansi(.bold)
+            + " → \(destinationRoot.path)"
+                .ansi(.brightBlack)
+        )
+
+        let fileManager = FileManager.default
+        let existed = fileManager.fileExists(
+            atPath: destinationURL.path
+        )
+
+        do {
+            if existed {
+                print(
+                    destinationURL.path
+                        .ansi(
+                            .brightBlack,
+                            .bold
+                        )
+                    + " exists — replacing..."
+                        .ansi(
+                            .brightBlack
+                        )
+                )
+
+                if let replaced = try fileManager.replaceItemAt(
+                    destinationURL,
+                    withItemAt: sourceURL
+                ) {
+                    print(
+                        "Binary ".ansi(.brightBlack)
+                        + "re".ansi(.brightBlack)
+                        + "placed at ".ansi(.brightBlack)
+                        + replaced.path.ansi(
+                            .bold,
+                            .brightBlack
+                        )
+                    )
+                } else {
+                    print(
+                        """
+                        Binary replaced, but no new URL was returned.
+                        """
+                        .ansi(.yellow)
+                    )
+                }
+            } else {
+                try fileManager.moveItem(
+                    at: sourceURL,
+                    to: destinationURL
+                )
+
+                print(
+                    "Binary ".ansi(.brightBlack)
+                    + "placed at ".ansi(.brightBlack)
+                    + destinationURL.path.ansi(
+                        .bold,
+                        .brightBlack
+                    )
+                )
+            }
+        } catch {
+            throw DeployError.replaceFailed(
+                src: sourceURL,
+                dst: destinationURL,
+                underlying: error.localizedDescription
+            )
+        }
+
+        do {
+            try writeMetadata(
+                for: productName,
+                projectDir: projectDir,
+                config: config,
+                destinationRoot: destinationRoot
+            )
+        } catch {
+            print(
+                DeployError.metadataWriteFailed(
+                    destinationRoot
+                        .appendingPathComponent(
+                            "\(productName).metadata"
+                        ),
+                    underlying: error.localizedDescription
+                )
+                .formatted()
+            )
+        }
+
+        let banner =
+            "\n        \(productName) "
+                .ansi(.bold)
+            + "is now an executable binary for "
+            + projectDir.lastPathComponent
+                .ansi(.italic)
+            + "\n    "
+
+        print(
+            banner
+        )
     }
 
     private static func resolvedBuildProductURL(
-        targetName: String,
+        productName: String,
         from projectDir: URL,
         config: Build.Config
     ) -> URL {
         let fallbackURL = buildProductURL(
-            targetName: targetName,
+            productName: productName,
             from: projectDir,
             config: config
         )
@@ -107,10 +226,12 @@ public enum Deploy {
             treatingStartAsDirectory: true,
             includingStart: true,
             maxDepth: maximumBuildProductAncestorDepth,
-            where: { candidate in
+            where: {
+                candidate in
+
                 FileManager.default.fileExists(
                     atPath: buildProductURL(
-                        targetName: targetName,
+                        productName: productName,
                         from: candidate,
                         config: config
                     ).path
@@ -121,43 +242,81 @@ public enum Deploy {
         }
 
         return buildProductURL(
-            targetName: targetName,
+            productName: productName,
             from: ancestor,
             config: config
         )
     }
 
     private static func buildProductURL(
-        targetName: String,
+        productName: String,
         from projectDir: URL,
         config: Build.Config
     ) -> URL {
-        projectDir.standardizedFileURL
-            .appendingPathComponent(".build", isDirectory: true)
-            .appendingPathComponent(config.buildDirComponent, isDirectory: true)
-            .appendingPathComponent(targetName, isDirectory: false)
+        projectDir
+            .standardizedFileURL
+            .appendingPathComponent(
+                ".build",
+                isDirectory: true
+            )
+            .appendingPathComponent(
+                config.buildDirComponent,
+                isDirectory: true
+            )
+            .appendingPathComponent(
+                productName,
+                isDirectory: false
+            )
     }
 
-    private static func ensureDir(_ dir: URL) throws {
-        do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
-        catch { throw DeployError.createDirectoryFailed(dir, underlying: error.localizedDescription) }
+    private static func ensureDir(
+        _ directory: URL
+    ) throws {
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw DeployError.createDirectoryFailed(
+                directory,
+                underlying: error.localizedDescription
+            )
+        }
     }
 
     private static func writeMetadata(
-        for targetName: String,
+        for productName: String,
         projectDir: URL,
         config: Build.Config,
         destinationRoot: URL
     ) throws {
-        let metaURL = destinationRoot.appendingPathComponent("\(targetName).metadata")
-        let content =
-        """
+        let metadataURL = destinationRoot
+            .appendingPathComponent(
+                "\(productName).metadata"
+            )
+
+        let content = """
         ProjectRootPath=\(projectDir.path)
         BuildType=\(config.buildDirComponent)
         DeployedAt=\(ISO8601DateFormatter().string(from: Date()))
         DestinationRoot=\(destinationRoot.path)
         """
-        try content.write(to: metaURL, atomically: true, encoding: .utf8)
-        print("Metadata written: ".ansi(.brightBlack) + metaURL.path.ansi(.brightBlack, .bold))
+
+        try content.write(
+            to: metadataURL,
+            atomically: true,
+            encoding: .utf8
+        )
+
+        print(
+            "Metadata written: ".ansi(
+                .brightBlack
+            )
+            + metadataURL.path.ansi(
+                .brightBlack,
+                .bold
+            )
+        )
     }
 }

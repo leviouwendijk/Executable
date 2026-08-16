@@ -63,14 +63,14 @@ extension ExecutableFlowSuite {
 
                 let binary = fixture.root
                     .appendingPathComponent(
-                        ".build/debug/FixtureCLI"
+                        ".build/debug/fixture-cli"
                     )
 
                 try Expect.true(
                     FileManager.default.fileExists(
                         atPath: binary.path
                     ),
-                    "build produces FixtureCLI binary"
+                    "build produces executable product binary name"
                 )
 
                 try await Build.clean(

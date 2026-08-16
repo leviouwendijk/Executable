@@ -60,7 +60,7 @@ private extension SwiftPackageFixture {
                         targets: ["FixtureCore"]
                     ),
                     .executable(
-                        name: "FixtureCLI",
+                        name: "fixture-cli",
                         targets: ["FixtureCLI"]
                     ),
                     .executable(

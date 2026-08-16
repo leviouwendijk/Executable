@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-13T18:56:26Z",
-  "passed" : 7,
+  "generated_at" : "2026-08-16T00:50:11Z",
+  "passed" : 8,
   "results" : [
     {
       "display_name" : "targets",
-      "duration_seconds" : 2.14206600189209,
+      "duration_seconds" : 2.1757659912109375,
       "name" : "targets",
       "status" : "passed",
       "tags" : [
@@ -18,8 +18,20 @@
       ]
     },
     {
+      "display_name" : "products",
+      "duration_seconds" : 36.40983200073242,
+      "name" : "products",
+      "status" : "passed",
+      "tags" : [
+        "executables",
+        "products",
+        "regression",
+        "swiftpm"
+      ]
+    },
+    {
       "display_name" : "resolve",
-      "duration_seconds" : 1.450829029083252,
+      "duration_seconds" : 1.8514350652694702,
       "name" : "resolve",
       "status" : "passed",
       "tags" : [
@@ -31,7 +43,7 @@
     },
     {
       "display_name" : "build-library",
-      "duration_seconds" : 23.21749496459961,
+      "duration_seconds" : 20.46990191936493,
       "name" : "build-library",
       "status" : "passed",
       "tags" : [
@@ -43,7 +55,7 @@
     },
     {
       "display_name" : "process-evaluator",
-      "duration_seconds" : 0.03640902042388916,
+      "duration_seconds" : 0.03994596004486084,
       "name" : "process-evaluator",
       "status" : "passed",
       "tags" : [
@@ -54,7 +66,7 @@
     },
     {
       "display_name" : "swiftpm-processes",
-      "duration_seconds" : 0.052240967750549316,
+      "duration_seconds" : 0.034947991371154785,
       "name" : "swiftpm-processes",
       "status" : "passed",
       "tags" : [
@@ -66,7 +78,7 @@
     },
     {
       "display_name" : "object-renewer",
-      "duration_seconds" : 0.012736916542053223,
+      "duration_seconds" : 0.016883015632629395,
       "name" : "object-renewer",
       "status" : "passed",
       "tags" : [
@@ -77,7 +89,7 @@
     },
     {
       "display_name" : "build",
-      "duration_seconds" : 20.587366938591003,
+      "duration_seconds" : 17.25334405899048,
       "name" : "build",
       "status" : "passed",
       "tags" : [
@@ -90,5 +102,5 @@
   ],
   "skipped" : 0,
   "title" : "Executable flow tests",
-  "total" : 7
+  "total" : 8
 }

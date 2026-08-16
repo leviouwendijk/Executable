@@ -5,6 +5,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
 
     static let flows: [TestFlow] = [
         targetsFlow,
+        productsFlow,
         resolveFlow,
         buildLibraryFlow,
         processEvaluatorFlow,
