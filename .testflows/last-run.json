@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-16T00:58:12Z",
-  "passed" : 8,
+  "generated_at" : "2026-08-25T16:31:33Z",
+  "passed" : 9,
   "results" : [
     {
       "display_name" : "targets",
-      "duration_seconds" : 2.023386001586914,
+      "duration_seconds" : 2.3984739780426025,
       "name" : "targets",
       "status" : "passed",
       "tags" : [
@@ -19,7 +19,7 @@
     },
     {
       "display_name" : "products",
-      "duration_seconds" : 34.82741606235504,
+      "duration_seconds" : 39.205531001091,
       "name" : "products",
       "status" : "passed",
       "tags" : [
@@ -31,7 +31,7 @@
     },
     {
       "display_name" : "resolve",
-      "duration_seconds" : 1.3857660293579102,
+      "duration_seconds" : 1.4911130666732788,
       "name" : "resolve",
       "status" : "passed",
       "tags" : [
@@ -43,7 +43,7 @@
     },
     {
       "display_name" : "build-library",
-      "duration_seconds" : 21.022876024246216,
+      "duration_seconds" : 21.161635994911194,
       "name" : "build-library",
       "status" : "passed",
       "tags" : [
@@ -55,7 +55,7 @@
     },
     {
       "display_name" : "process-evaluator",
-      "duration_seconds" : 0.039512038230895996,
+      "duration_seconds" : 0.0403059720993042,
       "name" : "process-evaluator",
       "status" : "passed",
       "tags" : [
@@ -66,7 +66,7 @@
     },
     {
       "display_name" : "swiftpm-processes",
-      "duration_seconds" : 0.03161203861236572,
+      "duration_seconds" : 0.04449295997619629,
       "name" : "swiftpm-processes",
       "status" : "passed",
       "tags" : [
@@ -78,7 +78,7 @@
     },
     {
       "display_name" : "object-renewer",
-      "duration_seconds" : 0.010261058807373047,
+      "duration_seconds" : 0.029356002807617188,
       "name" : "object-renewer",
       "status" : "passed",
       "tags" : [
@@ -89,7 +89,7 @@
     },
     {
       "display_name" : "build",
-      "duration_seconds" : 18.31075394153595,
+      "duration_seconds" : 20.06905496120453,
       "name" : "build",
       "status" : "passed",
       "tags" : [
@@ -98,9 +98,21 @@
         "regression",
         "swiftpm"
       ]
+    },
+    {
+      "display_name" : "swift-run",
+      "duration_seconds" : 20.563566088676453,
+      "name" : "swift-run",
+      "status" : "passed",
+      "tags" : [
+        "execution",
+        "process",
+        "regression",
+        "swiftpm"
+      ]
     }
   ],
   "skipped" : 0,
   "title" : "Executable flow tests",
-  "total" : 8
+  "total" : 9
 }
