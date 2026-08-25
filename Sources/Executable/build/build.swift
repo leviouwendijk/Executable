@@ -42,6 +42,39 @@ public enum Build {
         return result
     }
 
+    @discardableResult
+    public static func captured(
+        at dir: URL,
+        config: Config,
+        argv_audit: [String]? = nil
+    ) async throws -> BuildResult {
+        let result = try await runSwift(
+            command: config.buildArgs,
+            in: dir,
+            onOutput: nil
+        )
+
+        if config.updateBuiltOnSuccess {
+            do {
+                try updateBuiltVersionSnapshot(
+                    at: dir,
+                    argv: argv_audit
+                )
+            } catch {
+                fputs(
+                    "Note: failed to update built version snapshot:\n",
+                    stderr
+                )
+                fputs(
+                    "\(error.localizedDescription.indent())\n",
+                    stderr
+                )
+            }
+        }
+
+        return result
+    }
+
     /// Alias kept for clarity when a caller semantically means “build only”.
     @discardableResult
     public static func only(at dir: URL, config: Config) async throws -> BuildResult {
@@ -63,7 +96,16 @@ public enum Build {
     }
 
     @discardableResult
-    package static func runSwift(command: [String], in dir: URL) async throws -> BuildResult {
+    package static func runSwift(
+        command: [String],
+        in dir: URL,
+        onOutput: ProcessOutputHandler? = { chunk in
+            Terminal.write(
+                chunk,
+                to: .standardOutput
+            )
+        }
+    ) async throws -> BuildResult {
         let processResult = try await ProcessRunner().run(
             .init(
                 executable: .path(
@@ -81,12 +123,7 @@ public enum Build {
                 io: .pseudoTerminal,
                 outputLimit: .max
             ),
-            onStdout: { chunk in
-                Terminal.write(
-                    chunk,
-                    to: .standardOutput
-                )
-            }
+            onStdout: onOutput
         )
 
         let code: Int32

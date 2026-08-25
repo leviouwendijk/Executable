@@ -12,5 +12,6 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         swiftPMProcessesFlow,
         objectRenewerFlow,
         buildFlow,
+        swiftRunFlow,
     ]
 }
