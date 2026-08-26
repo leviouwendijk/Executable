@@ -13,6 +13,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         objectRenewerFlow,
         buildFlow,
         buildWorkflowFlow,
+        packageCommandFlow,
         swiftRunFlow,
     ]
 }
