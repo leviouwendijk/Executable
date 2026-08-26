@@ -109,6 +109,35 @@ public enum AppBundle {
         try linkResourcesBundleIfPresent(appName: appName, from: buildDir, into: appDir, bundleName: bundleName, force: force)
     }
 
+    public static func copyInfoPlist(
+        from source: URL,
+        into appDirectory: URL,
+        force: Bool = true
+    ) throws {
+        let destination = appDirectory.appendingPathComponent(
+            "Contents/Info.plist"
+        )
+        let fm = FileManager.default
+
+        try fm.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        if fm.fileExists(
+            atPath: destination.path
+        ), force {
+            try fm.removeItem(
+                at: destination
+            )
+        }
+
+        try fm.copyItem(
+            at: source,
+            to: destination
+        )
+    }
+
     private static func replaceWithSymlink(dest: URL, pointingTo src: URL, force: Bool) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)

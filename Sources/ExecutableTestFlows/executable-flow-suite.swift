@@ -14,6 +14,9 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         buildFlow,
         buildWorkflowFlow,
         packageCommandFlow,
+        commandFamilyFlow,
+        versionCommandFlow,
+        appCommandFlow,
         swiftRunFlow,
     ]
 }

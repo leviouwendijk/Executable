@@ -20,4 +20,21 @@ public enum Package {
             at: directory
         )
     }
+
+    public static func name(
+        at directory: URL
+    ) async throws -> String {
+        let data = try await SwiftPackageDumpInvocation.data(
+            in: directory
+        )
+
+        let reader = try SwiftPackageDumpReader(
+            blob: SwiftPackageDumpBlob(
+                raw: data
+            )
+        )
+
+        return reader.packageName()
+            ?? directory.lastPathComponent
+    }
 }
