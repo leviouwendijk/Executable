@@ -52,7 +52,7 @@
       "location" : "https://github.com/leviouwendijk/Interfaces.git",
       "state" : {
         "branch" : "master",
-        "revision" : "a93746d05fa8ee1ad0b3734f123bc7ea764f1c57"
+        "revision" : "0072526e1095f100b239e75ee4732a4491297989"
       }
     },
     {
@@ -61,7 +61,7 @@
       "location" : "https://github.com/leviouwendijk/IO.git",
       "state" : {
         "branch" : "master",
-        "revision" : "4476146fca3eb6e01e21b0ca14fc003976af105b"
+        "revision" : "52271833d4af8750eddc444148dcf7c187f8ad40"
       }
     },
     {
@@ -115,7 +115,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "2805249986511081f51de92815a73617e18690ea"
+        "revision" : "7992ebc66ba098758e574befc1b869978b38e82c"
       }
     },
     {
