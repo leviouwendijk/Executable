@@ -1,5 +1,6 @@
 import Arguments
 import Executable
+import Foundation
 import TestFlows
 
 extension ExecutableFlowSuite {
