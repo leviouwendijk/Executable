@@ -2,6 +2,14 @@ import Foundation
 import Interfaces
 
 public enum BuildLibrary {
+    public static var defaultModulesRoot: URL {
+        Build.defaultDeploymentDirectory
+            .appendingPathComponent(
+                "modules",
+                isDirectory: true
+            )
+    }
+
     public struct Output:
         Sendable
     {

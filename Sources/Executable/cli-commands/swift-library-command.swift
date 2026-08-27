@@ -90,10 +90,7 @@ public enum SwiftLibraryCommand: BoundArgumentCommand {
                 fileURLWithPath: $0,
                 isDirectory: true
             )
-        } ?? Build.defaultDeploymentDirectory.appendingPathComponent(
-            "modules",
-            isDirectory: true
-        )
+        } ?? BuildLibrary.defaultModulesRoot
 
         _ = try await BuildLibrary.buildAndExport(
             at: directory,

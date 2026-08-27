@@ -1,4 +1,5 @@
 import Foundation
+import Path
 
 public extension Build {
     struct Request: Sendable {
@@ -90,8 +91,7 @@ public extension Build {
     }
 
     static var defaultDeploymentDirectory: URL {
-        FileManager.default
-            .homeDirectoryForCurrentUser
+        PathAnchor.home.directory_url
             .appendingPathComponent(
                 "sbm-bin",
                 isDirectory: true
