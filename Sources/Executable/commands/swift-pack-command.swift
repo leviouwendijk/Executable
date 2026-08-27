@@ -75,6 +75,10 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
             request
         )
 
+        SwiftBuildCommand.present(
+            plan
+        )
+
         _ = try await Build.execute(
             plan
         )

@@ -136,6 +136,10 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             buildRequest
         )
 
+        present(
+            plan
+        )
+
         _ = try await Build.execute(
             plan
         )
@@ -225,6 +229,92 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             defaultProject: defaultProject,
             updateBuiltOnSuccess: updateBuiltOnSuccess
         )
+    }
+}
+
+extension SwiftBuildCommand {
+    package static func present(
+        _ plan: Build.Plan
+    ) {
+        for line in presentationLines(
+            for: plan
+        ) {
+            print(line)
+        }
+    }
+
+    package static func presentationLines(
+        for plan: Build.Plan
+    ) -> [String] {
+        var lines: [String] = []
+
+        switch plan.request.source {
+        case .direct:
+            break
+
+        case .buildObject(_, let arguments):
+            let quoted = arguments
+                .map(String.init(reflecting:))
+                .joined(separator: " ")
+
+            let effective = arguments
+                .joined(separator: " ")
+
+            lines.append(
+                "Detected preconfigured build instructions, intercepting build commands."
+            )
+            lines.append(
+                "    (You provided no overriding flags or options)."
+            )
+            lines.append("")
+            lines.append(
+                "    Arguments found: \(quoted)"
+            )
+            lines.append(
+                "    Invocation (effective): sbm \(effective)"
+            )
+            lines.append("")
+        }
+
+        let selection = plan.request.selection
+        let usesDefaultProductSelection =
+            selection.products.isEmpty
+            && selection.legacyTargets.isEmpty
+            && selection.skippedProducts.isEmpty
+            && selection.legacySkippedTargets.isEmpty
+            && !selection.cliOnly
+            && !selection.keepApps
+
+        let products: String
+
+        if usesDefaultProductSelection {
+            products = "all executable products"
+        } else if plan.selectedProductNames.isEmpty {
+            products = "none"
+        } else {
+            products = plan.selectedProductNames.joined(
+                separator: ", "
+            )
+        }
+
+        lines.append(
+            "Building \(plan.request.project.lastPathComponent)"
+        )
+        lines.append(
+            "    mode      \(plan.request.config.buildDirComponent)"
+        )
+        lines.append(
+            "    products  \(products)"
+        )
+        lines.append(
+            "    project   \(plan.request.project.path)"
+        )
+        lines.append(
+            "    source    \(plan.request.source.description)"
+        )
+        lines.append("")
+
+        return lines
     }
 }
 
