@@ -1,6 +1,7 @@
 import Arguments
 import Executable
 import TestFlows
+import Version
 
 extension ExecutableFlowSuite {
     static var versionCommandFlow: TestFlow {
@@ -48,7 +49,7 @@ extension ExecutableFlowSuite {
                 try Expect.equal(
                     try invocation.value(
                         "target",
-                        as: SwiftVersionBumpTarget.self
+                        as: VersionReference.self
                     ),
                     .release,
                     "increment target parses through ArgumentValue"
@@ -57,7 +58,7 @@ extension ExecutableFlowSuite {
                 try Expect.equal(
                     try invocation.value(
                         "level",
-                        as: SwiftVersionBumpLevel.self
+                        as: ObjectVersionLevel.self
                     ),
                     .minor,
                     "increment level parses through ArgumentValue"
