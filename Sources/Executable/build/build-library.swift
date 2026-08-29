@@ -1,5 +1,4 @@
 import Foundation
-import Interfaces
 
 public enum BuildLibrary {
     public static var defaultModulesRoot: URL {
@@ -24,12 +23,16 @@ public enum BuildLibrary {
         local: Bool,
         modulesRoot: URL
     ) async throws -> Output {
-        let packageName = try await packageInfo(
-            dir
+        let manifest = try await Package.manifest(
+            at: dir
         )
 
-        let libraryProducts = try await libraryProducts(
-            dir
+        let packageName = BuildLibrary.packageInfo(
+            manifest
+        )
+
+        let libraryProducts = BuildLibrary.libraryProducts(
+            manifest
         )
 
         guard !libraryProducts.isEmpty else {
@@ -133,20 +136,19 @@ public enum BuildLibrary {
     package static func packageInfo(
         _ dir: URL
     ) async throws -> String {
-        let data = try await SwiftPackageDumpInvocation.data(
-            in: dir
+        let manifest = try await Package.manifest(
+            at: dir
         )
 
-        let blob = SwiftPackageDumpBlob(
-            raw: data
+        return packageInfo(
+            manifest
         )
+    }
 
-        let reader = try SwiftPackageDumpReader(
-            blob: blob
-        )
-
-        return reader.packageName()
-            ?? dir.lastPathComponent
+    package static func packageInfo(
+        _ manifest: SwiftPackageManifest
+    ) -> String {
+        manifest.name
     }
 
     package struct LibraryProduct:
@@ -168,39 +170,28 @@ public enum BuildLibrary {
     package static func libraryProducts(
         _ dir: URL
     ) async throws -> [LibraryProduct] {
-        let data = try await SwiftPackageDumpInvocation.data(
-            in: dir
+        let manifest = try await Package.manifest(
+            at: dir
         )
 
-        let blob = SwiftPackageDumpBlob(
-            raw: data
+        return libraryProducts(
+            manifest
         )
+    }
 
-        let reader = try SwiftPackageDumpReader(
-            blob: blob
-        )
-
-        return reader.allProducts().compactMap {
-            product -> LibraryProduct? in
-
-            guard
-                let type = try? product["type"]?.objectValue,
-                type["library"] != nil,
-                let name = try? product["name"]?.stringValue,
-                let targetValues = try? product["targets"]?.arrayValue
-            else {
-                return nil
+    package static func libraryProducts(
+        _ manifest: SwiftPackageManifest
+    ) -> [LibraryProduct] {
+        manifest.products
+            .filter {
+                $0.kind == .library
             }
-
-            let targets = targetValues.compactMap {
-                try? $0.stringValue
+            .map { product in
+                LibraryProduct(
+                    name: product.name,
+                    targets: product.targets
+                )
             }
-
-            return LibraryProduct(
-                name: name,
-                targets: targets
-            )
-        }
     }
 
     package static func artifactURLs(

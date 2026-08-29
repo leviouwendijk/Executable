@@ -1,5 +1,4 @@
 import Foundation
-import Interfaces
 
 public enum ExecutableRole:
     String,
@@ -22,42 +21,32 @@ public enum TargetsDetailed {
     public static func list(
         in packageDir: URL
     ) async throws -> [ExecutableTarget] {
-        let data = try await SwiftPackageDumpInvocation.data(
-            in: packageDir
+        let manifest = try await Package.manifest(
+            at: packageDir
         )
 
-        let blob = SwiftPackageDumpBlob(
-            raw: data
+        return try list(
+            in: manifest
         )
+    }
 
-        let reader = try SwiftPackageDumpReader(
-            blob: blob
-        )
-
-        let rawTargets = reader.allTargets()
-
-        let executables = rawTargets.compactMap {
-            dictionary -> ExecutableTarget? in
-
-            guard
-                (try? dictionary["type"]?.stringValue)
-                    == "executable",
-                let name = try? dictionary["name"]?.stringValue
-            else {
-                return nil
+    public static func list(
+        in manifest: SwiftPackageManifest
+    ) throws -> [ExecutableTarget] {
+        let executables = manifest.targets
+            .filter {
+                $0.type == "executable"
             }
-
-            let path = try? dictionary["path"]?.stringValue
-
-            return .init(
-                name: name,
-                path: path,
-                role: guessRole(
-                    name: name,
-                    path: path
+            .map { target in
+                ExecutableTarget(
+                    name: target.name,
+                    path: target.path,
+                    role: guessRole(
+                        name: target.name,
+                        path: target.path
+                    )
                 )
-            )
-        }
+            }
 
         if executables.isEmpty {
             throw TargetsError.noExecutablesFound

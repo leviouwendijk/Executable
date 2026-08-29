@@ -1,5 +1,4 @@
 import Foundation
-import Interfaces
 
 public enum Package {
     public typealias Result = Resolve.Result
@@ -22,20 +21,25 @@ public enum Package {
         )
     }
 
-    public static func name(
+    public static func manifest(
         at directory: URL
-    ) async throws -> String {
+    ) async throws -> SwiftPackageManifest {
         let data = try await SwiftPackageDumpInvocation.data(
             in: directory
         )
 
-        let reader = try SwiftPackageDumpReader(
-            blob: SwiftPackageDumpBlob(
-                raw: data
-            )
+        return try SwiftPackageManifest(
+            dump: data,
+            fallbackName: directory.lastPathComponent
         )
+    }
 
-        return reader.packageName()
-            ?? directory.lastPathComponent
+    public static func name(
+        at directory: URL
+    ) async throws -> String {
+        try await manifest(
+            at: directory
+        )
+        .name
     }
 }

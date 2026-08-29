@@ -15,12 +15,16 @@ public extension Build {
             )
         }
 
-        let executableProducts = try await Products.executables(
-            in: request.project
+        let manifest = try await Package.manifest(
+            at: request.project
         )
 
-        let executableTargets = try await TargetsDetailed.list(
-            in: request.project
+        let executableProducts = try Products.executables(
+            in: manifest
+        )
+
+        let executableTargets = try TargetsDetailed.list(
+            in: manifest
         )
 
         let targetRoles = Dictionary(

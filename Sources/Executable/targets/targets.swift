@@ -1,23 +1,26 @@
 import Foundation
-import Interfaces
 
 public enum Targets {
     public static func executableNames(
         in packageDir: URL
     ) async throws -> [String] {
-        let data = try await SwiftPackageDumpInvocation.data(
-            in: packageDir
+        let manifest = try await Package.manifest(
+            at: packageDir
         )
 
-        let blob = SwiftPackageDumpBlob(
-            raw: data
+        return try executableNames(
+            in: manifest
         )
+    }
 
-        let reader = try SwiftPackageDumpReader(
-            blob: blob
-        )
-
-        let names = reader.executableTargetNames()
+    public static func executableNames(
+        in manifest: SwiftPackageManifest
+    ) throws -> [String] {
+        let names = manifest.targets
+            .filter {
+                $0.type == "executable"
+            }
+            .map(\.name)
 
         if names.isEmpty {
             throw TargetsError.noExecutablesFound

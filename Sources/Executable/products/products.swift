@@ -1,43 +1,29 @@
 import Foundation
-import Interfaces
 
 public enum Products {
     public static func executables(
         in packageDir: URL
     ) async throws -> [ExecutableProduct] {
-        let data = try await SwiftPackageDumpInvocation.data(
-            in: packageDir
+        let manifest = try await Package.manifest(
+            at: packageDir
         )
 
-        let blob = SwiftPackageDumpBlob(
-            raw: data
+        return try executables(
+            in: manifest
         )
+    }
 
-        let reader = try SwiftPackageDumpReader(
-            blob: blob
-        )
-
-        let explicitProducts = reader
-            .allProducts()
-            .compactMap {
-                product -> ExecutableProduct? in
-
-                guard
-                    let type = try? product["type"]?.objectValue,
-                    type["executable"] != nil,
-                    let name = try? product["name"]?.stringValue,
-                    let targetValues = try? product["targets"]?.arrayValue
-                else {
-                    return nil
-                }
-
-                let targets = targetValues.compactMap {
-                    try? $0.stringValue
-                }
-
-                return .init(
-                    name: name,
-                    targets: targets
+    public static func executables(
+        in manifest: SwiftPackageManifest
+    ) throws -> [ExecutableProduct] {
+        let explicitProducts = manifest.products
+            .filter {
+                $0.kind == .executable
+            }
+            .map {
+                ExecutableProduct(
+                    name: $0.name,
+                    targets: $0.targets
                 )
             }
 
@@ -47,8 +33,11 @@ public enum Products {
             )
         )
 
-        let implicitProducts = reader
-            .executableTargetNames()
+        let implicitProducts = manifest.targets
+            .filter {
+                $0.type == "executable"
+            }
+            .map(\.name)
             .filter {
                 !explicitlyCoveredTargets.contains(
                     $0
@@ -81,6 +70,15 @@ public enum Products {
     ) async throws -> [String] {
         try await executables(
             in: packageDir
+        )
+        .map(\.name)
+    }
+
+    public static func executableNames(
+        in manifest: SwiftPackageManifest
+    ) throws -> [String] {
+        try executables(
+            in: manifest
         )
         .map(\.name)
     }
