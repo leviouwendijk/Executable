@@ -77,7 +77,8 @@ public extension Build {
             project: URL,
             config: Config,
             destination: URL = Build.defaultDeploymentDirectory,
-            deploy: Bool = true,
+            // deploy: Bool = true,
+            deploy: Bool = false,
             selection: Selection = .init(),
             source: Source = .direct(arguments: [])
         ) {
