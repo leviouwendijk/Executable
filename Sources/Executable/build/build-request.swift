@@ -71,6 +71,7 @@ public extension Build {
         public let destination: URL
         public let deploy: Bool
         public let selection: Selection
+        public let signing: Signing
         public let source: Source
 
         public init(
@@ -80,6 +81,7 @@ public extension Build {
             // deploy: Bool = true,
             deploy: Bool = false,
             selection: Selection = .init(),
+            signing: Signing = .init(),
             source: Source = .direct(arguments: [])
         ) {
             self.project = project
@@ -87,6 +89,7 @@ public extension Build {
             self.destination = destination
             self.deploy = deploy
             self.selection = selection
+            self.signing = signing
             self.source = source
         }
     }

@@ -30,13 +30,16 @@ public extension Build {
     struct ExecutionResult: Sendable {
         public let plan: Plan
         public let build: BuildResult
+        public let signing: [ProductSigningResult]
 
         public init(
             plan: Plan,
-            build: BuildResult
+            build: BuildResult,
+            signing: [ProductSigningResult] = []
         ) {
             self.plan = plan
             self.build = build
+            self.signing = signing
         }
     }
 
@@ -50,6 +53,7 @@ public extension Build {
         case unknownTargets([String])
         case unknownSkippedProducts([String])
         case unknownSkippedTargets([String])
+        case unknownSigningProducts([String])
 
         public var errorDescription: String? {
             switch self {
@@ -64,6 +68,9 @@ public extension Build {
 
             case .unknownSkippedTargets(let names):
                 return "Unknown executable target(s) in --skip-targets: \(names.joined(separator: ", "))."
+
+            case .unknownSigningProducts(let names):
+                return "Unknown executable product(s) in code-signing configuration: \(names.joined(separator: ", "))."
             }
         }
     }

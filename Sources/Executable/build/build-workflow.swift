@@ -5,7 +5,8 @@ public extension Build {
         _ request: Request
     ) async throws -> Plan {
         guard request.deploy
-                || request.selection.requiresResolution else {
+                || request.selection.requiresResolution
+                || request.signing.requiresResolution else {
             return Plan(
                 request: request,
                 executableProducts: [],
@@ -40,6 +41,18 @@ public extension Build {
         let knownTargets = Set(
             executableProducts.flatMap(\.targets)
         )
+
+        let unknownSigningProducts = Set(
+            request.signing.products.keys
+        )
+        .subtracting(knownProducts)
+        .sorted()
+
+        guard unknownSigningProducts.isEmpty else {
+            throw ResolutionError.unknownSigningProducts(
+                unknownSigningProducts
+            )
+        }
 
         let unknownProducts = request.selection.products
             .subtracting(knownProducts)
@@ -180,6 +193,54 @@ public extension Build {
             )
         }
 
+        var sourceSignings: [(
+            product: String,
+            result: CodeSigning.SignResult
+        )] = []
+
+        for product in plan.selectedProducts {
+            guard let configuration = plan.request.signing.configuration(
+                for: product.name
+            ) else {
+                continue
+            }
+
+            let signer = try await CodeSigning.resolve(
+                configuration.identity
+            )
+            let target = plan.request.project
+                .standardizedFileURL
+                .appendingPathComponent(
+                    ".build",
+                    isDirectory: true
+                )
+                .appendingPathComponent(
+                    plan.request.config.buildDirComponent,
+                    isDirectory: true
+                )
+                .appendingPathComponent(
+                    product.name,
+                    isDirectory: false
+                )
+
+            let signing = try await CodeSigning.sign(
+                .init(
+                    target: target,
+                    signer: signer,
+                    identifier: configuration.identifier,
+                    entitlements: configuration.entitlements,
+                    hardenedRuntime: configuration.hardenedRuntime
+                )
+            )
+
+            sourceSignings.append(
+                (
+                    product: product.name,
+                    result: signing
+                )
+            )
+        }
+
         if plan.request.deploy {
             try Deploy.selected(
                 from: plan.request.project,
@@ -190,9 +251,57 @@ public extension Build {
             )
         }
 
+        var signingResults: [ProductSigningResult] = []
+
+        for signing in sourceSignings {
+            guard plan.request.deploy else {
+                signingResults.append(
+                    .init(
+                        product: signing.product,
+                        source: signing.result,
+                        deployedVerification: nil,
+                        deployedInspection: nil
+                    )
+                )
+                continue
+            }
+
+            let destinationRoot = plan.perProductDestinations[
+                signing.product
+            ] ?? plan.request.destination
+            let deployedTarget = destinationRoot
+                .appendingPathComponent(
+                    signing.product,
+                    isDirectory: false
+                )
+            let verification = try await CodeSigning.verify(
+                deployedTarget
+            )
+
+            guard verification.valid else {
+                throw SigningError.deployedSignatureInvalid(
+                    product: signing.product,
+                    target: deployedTarget,
+                    output: verification.output
+                )
+            }
+
+            signingResults.append(
+                .init(
+                    product: signing.product,
+                    source: signing.result,
+                    deployedVerification: verification,
+                    deployedInspection: try await CodeSigning.inspect(
+                        deployedTarget
+                    )
+                )
+            )
+        }
+
         return ExecutionResult(
             plan: plan,
-            build: result
+            build: result,
+            signing: signingResults
         )
     }
 }

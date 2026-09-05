@@ -94,6 +94,30 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         )
         public var map: [String]
 
+        @Opt(
+            "sign",
+            help: "Code-sign selected executable products using ad-hoc, apple-development, developer-id-application, apple-distribution, or fingerprint:<SHA1>."
+        )
+        public var signingIdentity: String?
+
+        @Opt(
+            "sign-identifier",
+            help: "Explicit code-signing identifier applied to selected products."
+        )
+        public var signingIdentifier: String?
+
+        @Opt(
+            "sign-entitlements",
+            help: "Entitlements plist used while code-signing. Relative paths resolve from the project root."
+        )
+        public var signingEntitlements: String?
+
+        @Flag(
+            "sign-hardened-runtime",
+            help: "Enable the hardened runtime while code-signing."
+        )
+        public var signingHardenedRuntime: Bool
+
         public init() {}
     }
 
@@ -342,6 +366,41 @@ private extension SwiftBuildCommand {
             )
         } ?? Build.defaultDeploymentDirectory
 
+        let hasSigningOptions =
+            options.signingIdentifier != nil
+            || options.signingEntitlements != nil
+            || options.signingHardenedRuntime
+
+        guard options.signingIdentity != nil || !hasSigningOptions else {
+            throw CodeSigningConfigurationError.signingOptionsRequireIdentity
+        }
+
+        let signing: Build.Signing
+
+        if let signingIdentity = options.signingIdentity {
+            let selector = try CodeSigning.IdentitySelector(
+                argument: signingIdentity
+            )
+            let entitlements = options.signingEntitlements.map { path in
+                URL(
+                    fileURLWithPath: path,
+                    relativeTo: project
+                )
+                .standardizedFileURL
+            }
+
+            signing = .init(
+                defaultConfiguration: .init(
+                    identity: selector,
+                    identifier: options.signingIdentifier,
+                    entitlements: entitlements,
+                    hardenedRuntime: options.signingHardenedRuntime
+                )
+            )
+        } else {
+            signing = .init()
+        }
+
         return Build.Request(
             project: project,
             config: .init(
@@ -369,6 +428,7 @@ private extension SwiftBuildCommand {
                     options.map
                 )
             ),
+            signing: signing,
             source: source
         )
     }
@@ -477,6 +537,33 @@ private extension SwiftBuildCommand {
         }
 
         appendMany("map", options.map)
+
+        if let signingIdentity = options.signingIdentity {
+            arguments += [
+                "--sign",
+                signingIdentity,
+            ]
+        }
+
+        if let signingIdentifier = options.signingIdentifier {
+            arguments += [
+                "--sign-identifier",
+                signingIdentifier,
+            ]
+        }
+
+        if let signingEntitlements = options.signingEntitlements {
+            arguments += [
+                "--sign-entitlements",
+                signingEntitlements,
+            ]
+        }
+
+        if options.signingHardenedRuntime {
+            arguments.append(
+                "--sign-hardened-runtime"
+            )
+        }
 
         return arguments
     }
