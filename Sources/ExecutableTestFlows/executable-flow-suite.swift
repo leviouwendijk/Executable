@@ -7,6 +7,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         targetsFlow,
         productsFlow,
         packageIntrospectionFlow,
+        packageGraphFlow,
         resolveFlow,
         buildLibraryFlow,
         processEvaluatorFlow,
@@ -18,6 +19,8 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         commandFamilyFlow,
         versionCommandFlow,
         appCommandFlow,
+        codeSigningFlow,
+        signedDeploymentFlow,
         swiftRunFlow,
     ]
 }
