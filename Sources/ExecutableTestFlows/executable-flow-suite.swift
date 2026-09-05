@@ -8,6 +8,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         productsFlow,
         packageIntrospectionFlow,
         packageGraphFlow,
+        packageSourceInventoryFlow,
         resolveFlow,
         buildLibraryFlow,
         processEvaluatorFlow,
