@@ -40,6 +40,10 @@ let package = Package(
             branch: "master"
         ),
         .package(
+            url: "https://github.com/leviouwendijk/Primitives.git",
+            branch: "master"
+        ),
+        .package(
             url: "https://github.com/leviouwendijk/Version.git",
             branch: "master"
         ),
@@ -66,6 +70,7 @@ let package = Package(
                 .product(name: "Terminal", package: "Terminal"),
                 .product(name: "Indentation", package: "Indentation"),
                 .product(name: "Path", package: "Path"),
+                .product(name: "Primitives", package: "Primitives"),
                 .product(name: "Version", package: "Version"),
                 .product(name: "Arguments", package: "Arguments"),
             ]
