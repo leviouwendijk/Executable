@@ -31,11 +31,9 @@ public enum SwiftModernizeCommand: BoundArgumentCommand {
         _ options: Options,
         invocation: ParsedInvocation
     ) async throws {
-        let url = try BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: URL(
-                fileURLWithPath: FileManager.default.currentDirectoryPath,
-                isDirectory: true
-            )
+        let url = try BuildObjectDiscovery.requireLocal(
+            named: "build-object.pkl",
+            in: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         )
 
         let text = try String(

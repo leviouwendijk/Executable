@@ -40,6 +40,12 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         )
         public var project: String?
 
+        @Flag(
+            "inherit-ancestor",
+            help: "Opt in to a parent build-object.pkl. Shows the path and requires interactive 'yes' confirmation."
+        )
+        public var inheritAncestor: Bool
+
         @Opt(
             "destination",
             short: "o",
@@ -138,21 +144,45 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
     ) async throws {
         let buildRequest: Build.Request
 
-        if hasExplicitInput(invocation) {
+        if options.inheritAncestor {
+            // The opt-in means "use discovered defaults", not "override with direct flags".
+            let provided = auditArguments(from: options)
+            var permitted: [String] = []
+            if let project = options.project { permitted += ["--project", project] }
+            permitted.append("--inherit-ancestor")
+            guard provided == permitted else {
+                throw BuildObjectDiscoveryError.inheritanceOptionsConflict
+            }
+
+            let directory = options.project.map {
+                URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+            let local = try BuildObjectDiscovery.local(named: "build-object.pkl", in: directory)
+            var approvedAncestor: URL?
+            if local == nil,
+               let candidate = try? BuildObjectDiscovery.nearest(
+                   named: "build-object.pkl", from: directory, maxDepth: 5
+               ) {
+                print("Project: \(directory.path)")
+                print("Ancestor configuration: \(candidate.path)")
+                print("Apply its build arguments to this project? Type 'yes' to confirm:")
+                guard readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "yes" else {
+                    throw BuildObjectDiscoveryError.ancestorConfirmationDeclined(candidate)
+                }
+                approvedAncestor = candidate
+            }
+            buildRequest = try projectDefaultRequest(
+                from: directory,
+                approvedAncestorConfiguration: approvedAncestor
+            )
+        } else if hasExplicitInput(invocation) {
             buildRequest = try request(
                 from: options,
-                source: .direct(
-                    arguments: auditArguments(
-                        from: options
-                    )
-                )
+                source: .direct(arguments: auditArguments(from: options))
             )
         } else {
             buildRequest = try projectDefaultRequest(
-                from: URL(
-                    fileURLWithPath: FileManager.default.currentDirectoryPath,
-                    isDirectory: true
-                )
+                from: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
             )
         }
 
@@ -171,57 +201,62 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
     public static func projectDefaultRequest(
         from directory: URL,
-        updateBuiltOnSuccess: Bool = true
+        updateBuiltOnSuccess: Bool = true,
+        approvedAncestorConfiguration: URL? = nil
     ) throws -> Build.Request {
-        guard
-            let objectURL = try? BuildObjectConfiguration
-                .traverseForBuildObjectPkl(
-                    from: directory
-                ),
-            let configuration = try? BuildObjectConfiguration(
-                from: objectURL
-            ),
-            configuration.compile.use
-        else {
+        let root = directory.standardizedFileURL
+        let local = try BuildObjectDiscovery.local(named: "build-object.pkl", in: root)
+        let objectURL: URL?
+        if let local {
+            objectURL = local
+        } else if let approvedAncestorConfiguration {
+            let candidate = try BuildObjectDiscovery.nearest(
+                named: "build-object.pkl", from: root, maxDepth: 5
+            )
+            guard candidate.standardizedFileURL == approvedAncestorConfiguration.standardizedFileURL else {
+                throw BuildObjectDiscoveryError.ancestorNotApproved(approvedAncestorConfiguration)
+            }
+            objectURL = candidate
+        } else {
+            objectURL = nil
+        }
+
+        guard let objectURL else {
             return Build.Request(
-                project: directory,
-                config: .init(
-                    mode: .release,
-                    updateBuiltOnSuccess: updateBuiltOnSuccess
-                ),
-                source: .direct(
-                    arguments: []
-                )
+                project: root,
+                config: .init(mode: .release, updateBuiltOnSuccess: updateBuiltOnSuccess),
+                source: .direct(arguments: [])
+            )
+        }
+
+        // Malformed local configuration is an error, not an invitation to search upwards.
+        let configuration = try BuildObjectConfiguration(from: objectURL)
+        guard configuration.compile.use else {
+            return Build.Request(
+                project: root,
+                config: .init(mode: .release, updateBuiltOnSuccess: updateBuiltOnSuccess),
+                source: .direct(arguments: [])
             )
         }
 
         var arguments = configuration.compile.arguments
-
-        if let first = arguments.first?.lowercased(),
-           first == "build" || first == "sbm" {
+        if let first = arguments.first?.lowercased(), first == "build" || first == "sbm" {
             arguments.removeFirst()
         }
-
-        let parsed = try Arguments.parse(
-            arguments,
-            spec: try spec()
-        )
-
-        let options = try parsed.options(
-            Options.self
-        )
-
-        let request = try request(
+        let parsed = try Arguments.parse(arguments, spec: try spec())
+        let options = try parsed.options(Options.self)
+        if let override = options.project {
+            throw BuildObjectDiscoveryError.configurationOverridesProject(override)
+        }
+        if options.inheritAncestor {
+            throw BuildObjectDiscoveryError.inheritanceOptionsConflict
+        }
+        return try request(
             from: options,
-            source: .buildObject(
-                url: objectURL,
-                arguments: arguments
-            ),
-            defaultProject: directory,
+            source: .buildObject(url: objectURL, arguments: arguments),
+            defaultProject: root,
             updateBuiltOnSuccess: updateBuiltOnSuccess
         )
-
-        return request
     }
 
     public static func request(
@@ -508,6 +543,10 @@ private extension SwiftBuildCommand {
 
         if let project = options.project {
             arguments += ["--project", project]
+        }
+
+        if options.inheritAncestor {
+            arguments.append("--inherit-ancestor")
         }
 
         if let destination = options.destination {

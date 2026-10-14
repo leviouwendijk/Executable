@@ -61,8 +61,8 @@ public enum SwiftRemoteSetCommand: BoundArgumentCommand {
             options.project
         )
 
-        let objectURL = try BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: directory
+        let objectURL = try BuildObjectDiscovery.requireLocal(
+            named: "build-object.pkl", in: directory
         )
 
         var configuration = try BuildObjectConfiguration(

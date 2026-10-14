@@ -215,11 +215,9 @@ public enum BuildObjectLifecycle {
         at directory: URL,
         backup: Bool = true
     ) throws -> ModernizeResult {
-        let configurationURL =
-            try BuildObjectConfiguration
-                .traverseForBuildObjectPkl(
-                    from: directory
-                )
+        let configurationURL = try BuildObjectDiscovery.requireLocal(
+            named: "build-object.pkl", in: directory
+        )
         let text = try String(
             contentsOf: configurationURL,
             encoding: .utf8

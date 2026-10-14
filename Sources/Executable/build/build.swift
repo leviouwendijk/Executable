@@ -212,72 +212,50 @@ public enum Build {
     // }
 
     private static func updateBuiltVersionSnapshot(at dir: URL, argv: [String]? = nil) throws {
-        // get build-object.pkl
-        let obj_url = try BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: dir, maxDepth: 6, buildFile: "build-object.pkl"
-        )
-        let obj_cfg = try BuildObjectConfiguration(from: obj_url)
+        let project = dir.standardizedFileURL
+        // No local build-object means no local snapshot. Never adopt parent metadata.
+        guard let objectURL = try BuildObjectDiscovery.local(
+            named: "build-object.pkl", in: project
+        ) else { return }
+        let configuration = try BuildObjectConfiguration(from: objectURL)
+        let release = configuration.versions.release
+        let compiledURL = project.appendingPathComponent("compiled.pkl")
+        try BuildObjectDiscovery.requireOwned(compiledURL, by: project)
 
-        let v_release = obj_cfg.versions.release
-
-        // soft try to get compiled.pkl
-        let compl_url_soft = try? BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: dir,
-            maxDepth: 6,
-            buildFile: "compiled.pkl"
-        )
-        // perform soft matching
-        // so that we continue and don't throw
-        // and just write out the compiled file if it isn't there to begin with
-
-        // only do comparison check if a file was found:
-        if let compl_url_found = compl_url_soft {
-            let compl_cfg = try CompiledLocalBuildObject(from: compl_url_found)
-            let v_compiled = compl_cfg.version
-            if v_compiled == v_release { 
+        if let existing = try BuildObjectDiscovery.local(named: "compiled.pkl", in: project) {
+            let compiled = try CompiledLocalBuildObject(from: existing)
+            if compiled.version == release {
                 print("compiled == release")
                 print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " written".ansi(.brightBlack))
-                return 
+                return
             }
             print("compiled != release")
             print("writing ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + "…".ansi(.brightBlack))
         }
 
-        // compose the url to write to if no soft url was found
-        let compl_url = compl_url_soft ?? dir.appendingPathComponent("compiled.pkl")
-
-        // try to detect 'compiled.pkl' in .gitignore, and auto-add if not present
+        // A symlinked .gitignore could otherwise mutate a file outside the project.
+        try BuildObjectDiscovery.requireOwned(project.appendingPathComponent(".gitignore"), by: project)
         let ignorable: [String] = ["compiled.pkl", "/compiled.pkl", "**/compiled.pkl"]
-        let success_string = ignorable.joined(separator: ", ")
         do {
             let (result, context) = try GitRepo.appending(
-                ignorable: ignorable,
-                to: ".gitignore",
-                in: dir
-            ) 
+                ignorable: ignorable, to: ".gitignore", in: project
+            )
             switch result {
-            case .appended:        
-                print("added to .gitignore: \(success_string)")
+            case .appended:
+                print("added to .gitignore: \(ignorable.joined(separator: ", "))")
                 print("snippet:")
                 printi(context.ansi(.brightBlack))
-            case .alreadyPresent:  
-                // blank returned
+            case .alreadyPresent:
                 break
-            case .notFound:        
+            case .notFound:
                 print(context)
-                break
             }
         } catch {
             fputs("note: could not update .gitignore: \(error)\n", stderr)
         }
 
-        let updated = CompiledLocalBuildObject(
-            version: v_release,
-            arguments: argv ?? []
-        )
-        try updated.write(to: compl_url)
-
-        // print("updated compiled version → \(v_release.string(prefixStyle: .none))")
-        print("compiled version += \(v_release.string(prefixStyle: .none))")
+        let updated = CompiledLocalBuildObject(version: release, arguments: argv ?? [])
+        try updated.write(to: compiledURL)
+        print("compiled version += \(release.string(prefixStyle: .none))")
     }
 }

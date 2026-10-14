@@ -16,6 +16,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         objectRenewerFlow,
         buildFlow,
         buildWorkflowFlow,
+        configurationDiscoveryFlow,
         packageCommandFlow,
         commandFamilyFlow,
         versionCommandFlow,

@@ -168,16 +168,16 @@ public struct ObjectRenewer: Sendable {
         // }
 
         if compilable {
-            let obj_url = try BuildObjectConfiguration.traverseForBuildObjectPkl(from: resolvedPaths.directory)
+            let obj_url = try BuildObjectDiscovery.requireLocal(
+                named: "build-object.pkl", in: resolvedPaths.directory
+            )
             let obj = try BuildObjectConfiguration(from: obj_url)
 
             let v_release = obj.versions.release
 
             // soft try to get compiled.pkl
-            let compl_url_soft = try? BuildObjectConfiguration.traverseForBuildObjectPkl(
-                from: resolvedPaths.directory,
-                maxDepth: 6,
-                buildFile: "compiled.pkl"
+            let compl_url_soft = try BuildObjectDiscovery.local(
+                named: "compiled.pkl", in: resolvedPaths.directory
             )
 
             var reasonToCompile = false

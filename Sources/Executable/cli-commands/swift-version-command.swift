@@ -24,15 +24,15 @@ public enum SwiftVersionCommand: RunnableArgumentCommand {
             isDirectory: true
         )
 
-        let objectURL = try BuildObjectConfiguration.traverseForBuildObjectPkl(
-            from: current
+        let objectURL = try BuildObjectDiscovery.requireLocal(
+            named: "build-object.pkl", in: current
         )
         let object = try BuildObjectConfiguration(
             from: objectURL
         )
 
-        let compiledURL = try CompiledLocalBuildObject.traverseForCompiledObjectPkl(
-            from: current
+        let compiledURL = try BuildObjectDiscovery.requireLocal(
+            named: "compiled.pkl", in: current
         )
         let compiled = try CompiledLocalBuildObject(
             from: compiledURL
