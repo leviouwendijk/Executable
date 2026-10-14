@@ -17,6 +17,7 @@ let package = Package(
             name: "etest",
             targets: ["ExecutableTestFlows"]
         ),
+        .executable(name: "t_executable", targets: ["ExecutableTests"]),
     ],
     dependencies: [
         .package(
@@ -47,6 +48,8 @@ let package = Package(
             url: "https://github.com/leviouwendijk/Version.git",
             branch: "master"
         ),
+        .package(url: "https://github.com/leviouwendijk/Parsers.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/Testing.git", branch: "master"),
         .package(
             url: "https://github.com/leviouwendijk/Arguments.git",
             branch: "master"
@@ -72,8 +75,17 @@ let package = Package(
                 .product(name: "Path", package: "Path"),
                 .product(name: "Primitives", package: "Primitives"),
                 .product(name: "Version", package: "Version"),
+                .product(name: "Parsers", package: "Parsers"),
                 .product(name: "Arguments", package: "Arguments"),
             ]
+        ),
+        .executableTarget(
+            name: "ExecutableTests",
+            dependencies: [
+                "Executable",
+                .product(name: "Testing", package: "Testing"),
+            ],
+            path: "Testing/ExecutableTests"
         ),
         .executableTarget(
             name: "ExecutableTestFlows",

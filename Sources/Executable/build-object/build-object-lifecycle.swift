@@ -224,11 +224,7 @@ public enum BuildObjectLifecycle {
             contentsOf: configurationURL,
             encoding: .utf8
         )
-        let parser = PklParser(
-            text
-        )
-
-        if let modern = try? parser.parseBuildObject() {
+        if let modern = try? BuildObjectConfiguration.parse(text) {
             return .init(
                 configurationURL: configurationURL,
                 name: modern.name,
@@ -237,9 +233,7 @@ public enum BuildObjectLifecycle {
             )
         }
 
-        parser.reset()
-
-        let legacy = try parser.parseLegacyBuildObject()
+        let legacy = try BuildObjectConfiguration.LegacyObject.parse(text)
         let modern = legacy.modernize()
         let backupURL: URL?
 

@@ -43,22 +43,16 @@ public enum SwiftModernizeCommand: BoundArgumentCommand {
             encoding: .utf8
         )
 
-        let parser = PklParser(
-            text
-        )
-
-        if let modern = try? parser.parseBuildObject() {
+        if let modern = try? BuildObjectConfiguration.parse(text) {
             print(
                 "Already modern: \(modern.name) (\(url.path))"
             )
             return
         }
 
-        parser.reset()
-
         print("Trying to parse legacy object…")
 
-        let legacy = try parser.parseLegacyBuildObject()
+        let legacy = try BuildObjectConfiguration.LegacyObject.parse(text)
         let modern = legacy.modernize()
 
         if options.backup {
