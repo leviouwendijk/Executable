@@ -1,0 +1,26 @@
+uuid = "85C5D063-7FA0-4A6B-A1CF-765C63F08107"
+name = "Executable"
+types { "library" }
+versions {
+    release {
+        major = 0
+        minor = 1
+        patch = 0
+    }
+}
+compile {
+    use = false
+    arguments { }
+}
+tests {
+    primary = "t_executable"
+
+    groups {
+        quick { "t_executable" }
+        integration { "etest" }
+        all { "t_executable" "etest" }
+    }
+}
+details = ""
+author = "levi"
+update = "https://raw.githubusercontent.com/leviouwendijk/Executable/master/build-object.pkl"

@@ -13,10 +13,14 @@ let package = Package(
             name: "Executable",
             targets: ["Executable"]
         ),
+
+        // lengthy testing
         .executable(
             name: "etest",
             targets: ["ExecutableTestFlows"]
         ),
+
+        // fast test suite
         .executable(name: "t_executable", targets: ["ExecutableTests"]),
     ],
     dependencies: [
