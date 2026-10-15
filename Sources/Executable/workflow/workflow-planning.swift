@@ -1,7 +1,7 @@
 import Foundation
 import Path
 
-/// Resolves paths and test products, but deliberately cannot execute actions.
+/// Read-only compilation from Pkl declarations into typed workflow operations.
 public enum WorkflowPlanning {
     public struct Workspace: Sendable {
         public let root: URL
@@ -9,41 +9,66 @@ public enum WorkflowPlanning {
         public let configuration: WorkflowConfiguration
     }
 
-    public enum Action: Sendable, Equatable {
-        case update
-        case build
+    public enum Condition: String, Sendable, Equatable {
+        case always
+        case never
+        case verified
+        case dependencyStale = "dependency_stale"
+    }
+
+    public struct Publication: Sendable, Equatable {
+        public let guardCondition: Condition
+        public let commit: Bool
+        public let push: Bool
+        public let message: String
+    }
+
+    public enum Operation: Sendable, Equatable {
+        case update(Condition)
+        case build(Build.Config.Mode)
         case test([String])
-        case commit
-        case push
+        case publish(Publication)
 
         public var description: String {
             switch self {
-            case .update: return "update"
-            case .build: return "build"
+            case .update(let condition): return "update [when: \(condition.rawValue)]"
+            case .build(let config): return "build [\(config == .debug ? "debug" : "release")]"
             case .test(let products): return "test: " + products.joined(separator: ", ")
-            case .commit: return "commit [not executed]"
-            case .push: return "push [not executed]"
+            case .publish(let policy):
+                return "publish [when: \(policy.guardCondition.rawValue), commit: \(policy.commit), push: \(policy.push), message: \(policy.message)]"
             }
         }
     }
 
-    public struct Step: Sendable {
+    public struct Stage: Sendable {
+        public let id: String
         public let package: String
         public let directory: URL
-        public let actions: [Action]
+        public let needs: [String]
+        public let branch: String
+        public let operations: [Operation]
     }
 
     public struct Plan: Sendable {
         public let name: String
         public let root: URL
         public let source: URL
-        public let steps: [Step]
+        public let requiresMessage: Bool
+        public let stages: [Stage]
+
+        public var includesPublication: Bool {
+            stages.contains { stage in
+                stage.operations.contains { operation in
+                    if case .publish(let policy) = operation { return policy.commit || policy.push }
+                    return false
+                }
+            }
+        }
     }
 
     public static func discover(startingAt start: URL) throws -> Workspace {
         guard let root = PathAncestorSearch.nearestAncestorContainingAny(
-            [".sbm/workflows.pkl"],
-            startingAt: start
+            [".sbm/workflows.pkl"], startingAt: start
         ) else {
             throw WorkflowConfigurationError.notFound(start.appendingPathComponent(".sbm/workflows.pkl"))
         }
@@ -53,7 +78,6 @@ public enum WorkflowPlanning {
     public static func load(root: URL) throws -> Workspace {
         let canonical = root.resolvingSymlinksInPath().standardizedFileURL
         let source = canonical.appendingPathComponent(".sbm/workflows.pkl")
-        // Reject symbolic links in .sbm or workflows.pkl: the file must belong to the chosen root.
         guard source.resolvingSymlinksInPath().standardizedFileURL == source.standardizedFileURL else {
             throw WorkflowConfigurationError.invalidPackagePath(source.path)
         }
@@ -67,63 +91,108 @@ public enum WorkflowPlanning {
     public static func resolve(
         _ name: String,
         in workspace: Workspace,
-        from startAlias: String? = nil
+        from startID: String? = nil
     ) async throws -> Plan {
         guard let definition = workspace.configuration.workflows[name] else {
             throw WorkflowConfigurationError.unknownWorkflow(name)
         }
-        guard !definition.steps.isEmpty else { throw WorkflowConfigurationError.emptySteps(name) }
+        guard !definition.stages.isEmpty else { throw WorkflowConfigurationError.emptySteps(name) }
         try validateNames(in: workspace.configuration)
-        let definitions: [WorkflowConfiguration.Step]
-        if let startAlias {
-            let matches = definition.steps.indices.filter { definition.steps[$0].package == startAlias }
-            guard let first = matches.first else { throw WorkflowConfigurationError.unknownStep(startAlias) }
-            guard matches.count == 1 else { throw WorkflowConfigurationError.repeatedStep(startAlias) }
-            definitions = Array(definition.steps[first...])
-        } else {
-            definitions = definition.steps
+        let declared = definition.stages
+        var known = Set<String>()
+        for stage in declared {
+            guard validIdentifier(stage.id) else { throw WorkflowConfigurationError.invalidName(stage.id) }
+            guard known.insert(stage.id).inserted else { throw WorkflowConfigurationError.repeatedStep(stage.id) }
         }
-        var planned: [Step] = []
-        for step in definitions {
-            guard let rawPath = workspace.configuration.packages[step.package] else {
-                throw WorkflowConfigurationError.missingPackage(step.package)
-            }
-            let directory = try packageURL(rawPath, in: workspace.root)
-            guard !step.actions.isEmpty else {
-                throw WorkflowConfigurationError.emptyActions(step.package)
-            }
-            var actions: [Action] = []
-            for token in step.actions {
-                let action: Action
-                switch token {
-                case "update": action = .update
-                case "build": action = .build
-                case "commit": action = .commit
-                case "push": action = .push
-                default:
-                    guard token == "test" || token.hasPrefix("test:") else {
-                        throw WorkflowConfigurationError.unsupportedAction(token)
-                    }
-                    let selection = try testSelection(token)
-                    let testPlan = try await Tests.resolve(at: directory, selection: selection)
-                    action = .test(testPlan.products)
+        var seen = Set<String>()
+        for stage in declared {
+            for dependency in stage.needs ?? [] {
+                guard known.contains(dependency) else {
+                    throw WorkflowConfigurationError.unknownDependency(stage: stage.id, prerequisite: dependency)
                 }
-                actions.append(action)
+                guard seen.contains(dependency) else {
+                    throw WorkflowConfigurationError.forwardDependency(stage: stage.id, prerequisite: dependency)
+                }
             }
-            planned.append(Step(package: step.package, directory: directory, actions: actions))
+            seen.insert(stage.id)
         }
-        return Plan(name: name, root: workspace.root, source: workspace.source, steps: planned)
+
+        let defaults = definition.defaults
+        let configuration: Build.Config.Mode
+        switch defaults?.configuration ?? "debug" {
+        case "debug": configuration = .debug
+        case "release": configuration = .release
+        default: throw WorkflowConfigurationError.invalidPolicy("configuration")
+        }
+        guard (defaults?.onFailure ?? "stop") == "stop" else {
+            throw WorkflowConfigurationError.invalidPolicy("onFailure (only stop is implemented)")
+        }
+        guard let branch = defaults?.branch, !branch.isEmpty, !branch.hasPrefix("-") else {
+            throw WorkflowConfigurationError.invalidPolicy("defaults.branch is required")
+        }
+        if let input = definition.inputs?.message, input != "required" {
+            throw WorkflowConfigurationError.invalidPolicy("inputs.message = \(input)")
+        }
+
+        var planned: [Stage] = []
+        for stage in declared {
+            guard let raw = workspace.configuration.packages[stage.package] else {
+                throw WorkflowConfigurationError.missingPackage(stage.package)
+            }
+            let directory = try packageURL(raw, in: workspace.root)
+            var operations: [Operation] = []
+            if stage.update != nil || defaults?.update != nil {
+                let when = try condition(stage.update?.when ?? defaults?.update?.when ?? "always", allowed: [.always, .never, .dependencyStale])
+                operations.append(.update(when))
+            }
+            operations.append(.build(configuration))
+            if let test = stage.test {
+                guard !test.isEmpty else { throw WorkflowConfigurationError.invalidPolicy("empty test for \(stage.id)") }
+                let resolved = try await Tests.resolve(at: directory, selection: .product(test))
+                operations.append(.test(resolved.products))
+            }
+            if stage.publish != nil || defaults?.publish != nil {
+                let when = try condition(stage.publish?.when ?? defaults?.publish?.when ?? "verified", allowed: [.always, .never, .verified])
+                let publication = Publication(
+                    guardCondition: when,
+                    commit: stage.publish?.commit ?? defaults?.publish?.commit ?? false,
+                    push: stage.publish?.push ?? defaults?.publish?.push ?? false,
+                    message: stage.publish?.message ?? defaults?.publish?.message ?? "$message"
+                )
+                guard publication.message == "$message" || !publication.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw WorkflowConfigurationError.invalidPolicy("empty publish message")
+                }
+                operations.append(.publish(publication))
+            }
+            planned.append(Stage(id: stage.id, package: stage.package, directory: directory, needs: stage.needs ?? [], branch: branch, operations: operations))
+        }
+        if let startID {
+            guard let first = planned.firstIndex(where: { $0.id == startID }) else {
+                throw WorkflowConfigurationError.unknownStep(startID)
+            }
+            planned = Array(planned[first...])
+        }
+        return Plan(name: name, root: workspace.root, source: workspace.source,
+                    requiresMessage: definition.inputs?.message == "required", stages: planned)
     }
 
     public static func present(_ plan: Plan) {
-        print("Workflow: \(plan.name) [dry-run only]")
+        print("Workflow: \(plan.name) [resolved plan; no operations performed]")
         print("Workspace: \(plan.root.path)")
         print("Configuration: \(plan.source.path)")
-        for (index, step) in plan.steps.enumerated() {
-            print("\(index + 1). \(step.package) → \(step.directory.path)")
-            for action in step.actions { print("   • \(action.description)") }
+        for (index, stage) in plan.stages.enumerated() {
+            print("\(index + 1). \(stage.id) [\(stage.package)] → \(stage.directory.path)")
+            if !stage.needs.isEmpty { print("   needs: \(stage.needs.joined(separator: ", "))") }
+            for operation in stage.operations { print("   • \(operation.description)") }
         }
-        print("No workflow actions were executed.")
+        print("No workflow operations were executed.")
+    }
+
+    private static func condition(_ name: String, allowed: Set<Condition>) throws -> Condition {
+        guard let value = Condition(rawValue: name), allowed.contains(value) else {
+            throw WorkflowConfigurationError.invalidPolicy("when = \(name)")
+        }
+        return value
     }
 
     private static func validateNames(in configuration: WorkflowConfiguration) throws {
@@ -135,52 +204,32 @@ public enum WorkflowPlanning {
     private static func validIdentifier(_ text: String) -> Bool {
         guard let first = text.unicodeScalars.first else { return false }
         let start = CharacterSet.letters.union(CharacterSet(charactersIn: "_"))
-        let remaining = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
-        return start.contains(first) && text.unicodeScalars.dropFirst().allSatisfy(remaining.contains)
+        let remainder = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
+        return start.contains(first) && text.unicodeScalars.dropFirst().allSatisfy(remainder.contains)
     }
 
-    private static func packageURL(_ rawPath: String, in root: URL) throws -> URL {
-        guard !rawPath.isEmpty,
-              !rawPath.hasPrefix("/"),
-              !rawPath.hasPrefix("~"),
-              !rawPath.hasPrefix("$"),
-              !rawPath.split(separator: "/").contains("..") else {
-            throw WorkflowConfigurationError.invalidPackagePath(rawPath)
+    private static func packageURL(_ raw: String, in root: URL) throws -> URL {
+        guard !raw.isEmpty, !raw.hasPrefix("/"), !raw.hasPrefix("~"), !raw.hasPrefix("$"),
+              !raw.split(separator: "/").contains("..") else {
+            throw WorkflowConfigurationError.invalidPackagePath(raw)
         }
         let destination = try PathResolver.resolveURL(
-            rawPath,
-            relativeTo: .directoryURL(root),
-            terminalHint: .directory
+            raw, relativeTo: .directoryURL(root), terminalHint: .directory
         ).resolvingSymlinksInPath().standardizedFileURL
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
         guard destination == root || destination.path.hasPrefix(prefix) else {
-            throw WorkflowConfigurationError.invalidPackagePath(rawPath)
+            throw WorkflowConfigurationError.invalidPackagePath(raw)
         }
         var isDirectory: ObjCBool = false
         let manifest = destination.appendingPathComponent("Package.swift")
         guard FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDirectory),
-              isDirectory.boolValue,
-              FileManager.default.fileExists(atPath: manifest.path) else {
+              isDirectory.boolValue, FileManager.default.fileExists(atPath: manifest.path) else {
             throw WorkflowConfigurationError.missingPackageManifest(destination)
         }
-        // A manifest cannot redirect outside its resolved package directory.
         guard manifest.resolvingSymlinksInPath().standardizedFileURL.deletingLastPathComponent() == destination else {
             throw WorkflowConfigurationError.invalidPackagePath(manifest.path)
         }
         return destination
     }
-
-    private static func testSelection(_ token: String) throws -> TestConfiguration.Selection {
-        if token == "test" { return .primary }
-        if token == "test:all" { return .all }
-        let components = token.split(separator: ":", omittingEmptySubsequences: false)
-        if components.count == 3, components[0] == "test", !components[2].isEmpty {
-            switch components[1] {
-            case "group": return .group(String(components[2]))
-            case "product": return .product(String(components[2]))
-            default: break
-            }
-        }
-        throw WorkflowConfigurationError.unsupportedAction(token)
-    }
 }
+

@@ -10,7 +10,7 @@ public enum SwiftWorkflowCommand: ArgumentCommand {
         SwiftWorkflowRunCommand.self,
     ]
     public static func components() throws -> [CommandComponentLowerable] {
-        [about("Inspect and plan workspace workflows; execution is reserved for a later pass.")]
+        [about("Inspect, plan, and explicitly execute typed workspace workflows.")]
     }
 }
 
@@ -44,7 +44,7 @@ public enum SwiftWorkflowShowCommand: RunnableArgumentCommand {
     public static let name = "show"
     public static func components() throws -> [CommandComponentLowerable] {
         [
-            about("Resolve and display one workflow without running it."),
+            about("Resolve and display one typed workflow without executing it."),
             arg("name", as: String.self, help: "Named workflow to inspect."),
             opt("workspace", as: String.self, help: "Explicit workspace root."),
         ]
@@ -61,19 +61,35 @@ public enum SwiftWorkflowRunCommand: RunnableArgumentCommand {
     public static let name = "run"
     public static func components() throws -> [CommandComponentLowerable] {
         [
-            about("Plan a workflow; --dry-run is mandatory until execution is implemented."),
-            arg("name", as: String.self, help: "Named workflow to plan."),
+            about("Dry-run by default; real execution requires --execute; Git publish also requires --publish."),
+            arg("name", as: String.self, help: "Named workflow to run."),
             opt("workspace", as: String.self, help: "Explicit workspace root."),
-            opt("from", as: String.self, help: "Start at the named package alias."),
-            flag("dry-run", help: "Resolve and display actions without executing them."),
+            opt("from", as: String.self, help: "Plan starting from this stage id. Execution cannot skip prerequisites yet."),
+            opt("message", as: String.self, help: "Commit message supplied to publish operations."),
+            flag("dry-run", help: "Resolve and present the plan without performing operations."),
+            flag("execute", help: "Execute workflow operations rather than previewing them."),
+            flag("publish", help: "Explicitly permit workflow Git commit and push operations."),
         ]
     }
     public static func run(_ invocation: ParsedInvocation) async throws {
-        guard try invocation.flag("dry-run") else { throw WorkflowConfigurationError.readOnly }
         let name = try invocation.require("name", as: String.self)
-        let startAlias = try invocation.value("from", as: String.self)
+        let startID = try invocation.value("from", as: String.self)
         let workspace = try WorkflowCLI.workspace(try invocation.value("workspace", as: String.self))
-        let plan = try await WorkflowPlanning.resolve(name, in: workspace, from: startAlias)
-        WorkflowPlanning.present(plan)
+        let plan = try await WorkflowPlanning.resolve(name, in: workspace, from: startID)
+        let execute = try invocation.flag("execute")
+        let dryRun = try invocation.flag("dry-run")
+        let allowPublish = try invocation.flag("publish")
+        guard !(execute && dryRun) else {
+            throw WorkflowConfigurationError.invalidPolicy("--execute conflicts with --dry-run")
+        }
+        guard execute else {
+            guard !allowPublish else { throw WorkflowConfigurationError.invalidPolicy("--publish requires --execute") }
+            WorkflowPlanning.present(plan)
+            return
+        }
+        guard startID == nil else { throw WorkflowConfigurationError.executionFromUnsupported }
+        let message = try invocation.value("message", as: String.self)
+        try await WorkflowExecution.execute(plan, message: message, allowPublish: allowPublish)
     }
 }
+
