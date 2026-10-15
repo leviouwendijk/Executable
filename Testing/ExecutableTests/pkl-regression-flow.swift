@@ -18,15 +18,13 @@ extension ExecutableTestSuite {
                 compile: .init(use: true, arguments: ["-c", "debug"]),
                 details: "a test", author: "author", update: "manual"
             )
-            let parser = PklParser(config.string())
-            let decoded = try parser.parseBuildObject()
+            let decoded = try BuildObjectConfiguration.parse(config.string())
             try Expect.equal(decoded.name, "demo")
             try Expect.equal(decoded.uuid, uuid)
             try Expect.equal(Set(decoded.types.map(\.rawValue)), Set(["binary", "script"]))
             try Expect.equal(decoded.versions.release.patch, 3)
             try Expect.equal(decoded.compile.use, true)
             try Expect.equal(decoded.compile.arguments, ["-c", "debug"])
-            try Expect.equal(parser.idx, parser.input.endIndex)
         }
 
         Test("legacy configuration parsing and modernization") {
@@ -40,12 +38,10 @@ extension ExecutableTestSuite {
                 author = "author"
                 update = "manual"
                 """
-            let parser = PklParser(source)
-            let decoded = try parser.parseLegacyBuildObject()
+            let decoded = try BuildObjectConfiguration.LegacyObject.parse(source)
             try Expect.equal(decoded.name, "old")
             try Expect.equal(decoded.version.patch, 5)
             try Expect.equal(decoded.modernize().types, [.binary])
-            try Expect.equal(parser.idx, parser.input.endIndex)
         }
 
         Test("compiled configuration round trip") {
@@ -53,27 +49,29 @@ extension ExecutableTestSuite {
                 version: .init(major: 4, minor: 3, patch: 2),
                 arguments: ["-O", "-g"]
             )
-            let decoded = try PklParser(compiled.string()).parseCompiledBuildObject()
+            let decoded = try CompiledLocalBuildObject.parse(compiled.string())
             try Expect.equal(decoded.version.major, 4)
             try Expect.equal(decoded.arguments, ["-O", "-g"])
         }
 
         Test("compile defaults when omitted") {
-            let decoded = try PklParser(basic_pkl).parseBuildObject()
+            let decoded = try BuildObjectConfiguration.parse(basic_pkl)
             try Expect.equal(decoded.compile.use, false)
             try Expect.equal(decoded.compile.arguments, [])
         }
 
         Test("legacy numeric use and empty list") {
-            let decoded = try PklParser(basic_pkl + "\ncompile { use = 2 arguments {} }")
-                .parseBuildObject()
+            let decoded = try BuildObjectConfiguration.parse(
+                basic_pkl + "\ncompile { use = 2 arguments {} }"
+            )
             try Expect.equal(decoded.compile.use, true)
             try Expect.equal(decoded.compile.arguments, [])
         }
 
         Test("last duplicate field wins") {
-            let decoded = try PklParser(basic_pkl + "\nname = \"override\"")
-                .parseBuildObject()
+            let decoded = try BuildObjectConfiguration.parse(
+                basic_pkl + "\nname = \"override\""
+            )
             try Expect.equal(decoded.name, "override")
         }
 
@@ -82,7 +80,7 @@ extension ExecutableTestSuite {
                 of: "uuid = \"2D45ED1F-3F26-4C11-93D1-BB92E9C1A734\"", with: ""
             )
             let error = try Expect.throwsError(PklParserError.self) {
-                _ = try PklParser(source).parseBuildObject()
+                _ = try BuildObjectConfiguration.parse(source)
             }
             guard case .missingField("uuid") = error else {
                 throw UnexpectedPklError(error)
@@ -94,7 +92,7 @@ extension ExecutableTestSuite {
                 of: "2D45ED1F-3F26-4C11-93D1-BB92E9C1A734", with: "bad"
             )
             let error = try Expect.throwsError(PklParserError.self) {
-                _ = try PklParser(source).parseBuildObject()
+                _ = try BuildObjectConfiguration.parse(source)
             }
             guard case .invalidValue(field: "uuid", value: _) = error else {
                 throw UnexpectedPklError(error)
@@ -106,7 +104,7 @@ extension ExecutableTestSuite {
                 of: "types { \"binary\" }", with: "types { 3 }"
             )
             _ = try Expect.throwsError(PklParserError.self) {
-                _ = try PklParser(source).parseBuildObject()
+                _ = try BuildObjectConfiguration.parse(source)
             }
         }
 
@@ -115,7 +113,7 @@ extension ExecutableTestSuite {
                 of: "release { major = 0 minor = 1 patch = 0 }", with: ""
             )
             _ = try Expect.throwsError(PklParserError.self) {
-                _ = try PklParser(source).parseBuildObject()
+                _ = try BuildObjectConfiguration.parse(source)
             }
         }
 
@@ -123,7 +121,7 @@ extension ExecutableTestSuite {
             // Unlike the old test's unterminated string fixture, this is an
             // unequivocally incomplete assignment, so it exercises the lexer/parser.
             let error = try Expect.throwsError(PklParserError.self) {
-                _ = try PklParser("name =").parseBuildObject()
+                _ = try BuildObjectConfiguration.parse("name =")
             }
             guard case .syntaxError = error else {
                 throw UnexpectedPklError(error)

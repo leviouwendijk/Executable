@@ -3,18 +3,14 @@ import Version
 
 extension BuildObjectConfiguration {
     public func string() -> String {
-        let typesList = types
-        .map(\.rawValue)
-        .sorted()
-        .map { "    " + PklText.quote($0) }
-        .joined(separator: "\n")
+        let typesBlock = PklText.collection(
+            "types", values: types.map(\.rawValue).sorted()
+        )
 
         let pklContent = """
         uuid = \(PklText.quote(uuid.uuidString))
         name = \(PklText.quote(name))
-        types {
-        \(typesList)
-        }
+        \(typesBlock)
         versions {
             release {
                 major = \(versions.release.major)
@@ -24,7 +20,7 @@ extension BuildObjectConfiguration {
         }
         compile {
         \(compile.contents())
-        }
+        }\(tests.map { "\n" + $0.contents() } ?? "")
         details = \(PklText.quote(details))
         author = \(PklText.quote(author))
         update = \(PklText.quote(update))

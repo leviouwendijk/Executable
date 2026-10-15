@@ -8,6 +8,8 @@ public enum SwiftBuildManagerCommand: ArgumentCommand {
         SwiftAppCommand.self,
         SwiftAppExecCommand.self,
         SwiftBuildCommand.self,
+        SwiftTestCommand.self,
+        SwiftWorkflowCommand.self,
         SwiftLibraryCommand.self,
         SwiftRenewRepositoriesCommand.self,
         SwiftKillSwiftPMCommand.self,

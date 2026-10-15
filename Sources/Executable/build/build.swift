@@ -222,14 +222,15 @@ public enum Build {
         let compiledURL = project.appendingPathComponent("compiled.pkl")
         try BuildObjectDiscovery.requireOwned(compiledURL, by: project)
 
+        let recordedArguments = argv ?? []
         if let existing = try BuildObjectDiscovery.local(named: "compiled.pkl", in: project) {
             let compiled = try CompiledLocalBuildObject(from: existing)
-            if compiled.version == release {
-                print("compiled == release")
+            if compiled.version == release && compiled.arguments == recordedArguments {
+                print("compiled version and arguments unchanged")
                 print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " written".ansi(.brightBlack))
                 return
             }
-            print("compiled != release")
+            print("compiled version or arguments changed")
             print("writing ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + "…".ansi(.brightBlack))
         }
 
@@ -254,7 +255,7 @@ public enum Build {
             fputs("note: could not update .gitignore: \(error)\n", stderr)
         }
 
-        let updated = CompiledLocalBuildObject(version: release, arguments: argv ?? [])
+        let updated = CompiledLocalBuildObject(version: release, arguments: recordedArguments)
         try updated.write(to: compiledURL)
         print("compiled version += \(release.string(prefixStyle: .none))")
     }

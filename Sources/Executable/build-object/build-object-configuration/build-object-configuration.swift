@@ -8,6 +8,7 @@ public struct BuildObjectConfiguration: Codable, Sendable {
     public let types: [ExecutableObjectType]
     public var versions: ProjectVersions
     public let compile: CompileInstructionDefaults
+    public let tests: TestConfiguration?
     public let details: String
     public let author: String
     public let update: String
@@ -20,13 +21,15 @@ public struct BuildObjectConfiguration: Codable, Sendable {
         compile: CompileInstructionDefaults,
         details: String,
         author: String,
-        update: String
+        update: String,
+        tests: TestConfiguration? = nil
     ) {
         self.uuid = uuid
         self.name = name
         self.types = types
         self.versions = versions
         self.compile = compile
+        self.tests = tests
         self.details = details
         self.author = author
         self.update = update

@@ -13,6 +13,7 @@ enum BuildObjectPklDecoder {
         let types: [ExecutableObjectType]
         let versions: ProjectVersions
         let compile: CompileFields?
+        let tests: TestFields?
         let details: String
         let author: String
         let update: String
@@ -42,6 +43,11 @@ enum BuildObjectPklDecoder {
         let arguments: [String]?
     }
 
+    private struct TestFields: Decodable {
+        let primary: String
+        let groups: [String: [String]]?
+    }
+
     private struct BooleanOrInteger: Decodable {
         let value: Bool
         init(from decoder: Decoder) throws {
@@ -68,7 +74,8 @@ enum BuildObjectPklDecoder {
             compile: .init(use: dto.compile?.use?.value ?? false, arguments: dto.compile?.arguments ?? []),
             details: dto.details,
             author: dto.author,
-            update: dto.update
+            update: dto.update,
+            tests: dto.tests.map { TestConfiguration(primary: $0.primary, groups: $0.groups ?? [:]) }
         )
     }
 
@@ -148,6 +155,13 @@ enum BuildObjectPklDecoder {
         }
         if let compile = document.entries.last(where: { $0.name == "compile" }) {
             try allowed(try block(compile), ["use", "arguments"], context: "compile")
+        }
+        if let tests = document.entries.last(where: { $0.name == "tests" }) {
+            let entries = try block(tests)
+            try allowed(entries, ["primary", "groups"], context: "tests")
+            if let groups = entries.last(where: { $0.name == "groups" }) {
+                _ = try block(groups)
+            }
         }
     }
 }
