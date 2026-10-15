@@ -33,6 +33,32 @@ extension ExecutableFlowSuite {
                 }
             }
 
+            Step("embedded workflow help command is registered and discoverable") {
+                let spec = try SwiftBuildManagerCommand.spec()
+                let invocation = try Arguments.parse(
+                    ["help", "workflows"],
+                    spec: spec
+                )
+                try Expect.equal(
+                    invocation.commandPath.map(\.rawValue),
+                    ["sbm", "help", "workflows"],
+                    "built-in workflow help resolves without workspace lookup"
+                )
+                for phrase in [
+                    ".sbm/workflows.pkl",
+                    "--execute",
+                    "--publish",
+                    "--message",
+                    "dependency_stale",
+                    "needs",
+                ] {
+                    try Expect.true(
+                        SwiftHelpWorkflowsCommand.reference.contains(phrase),
+                        "embedded workflow help documents \(phrase)"
+                    )
+                }
+            }
+
             Step("kill aliases resolve canonically") {
                 let invocation = try Arguments.parse(
                     [
