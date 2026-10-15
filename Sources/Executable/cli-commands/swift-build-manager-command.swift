@@ -10,7 +10,7 @@ public enum SwiftBuildManagerCommand: ArgumentCommand {
         SwiftBuildCommand.self,
         SwiftTestCommand.self,
         SwiftWorkflowCommand.self,
-        SwiftHelpCommand.self,
+        SwiftDocsCommand.self,
         SwiftLibraryCommand.self,
         SwiftRenewRepositoriesCommand.self,
         SwiftKillSwiftPMCommand.self,

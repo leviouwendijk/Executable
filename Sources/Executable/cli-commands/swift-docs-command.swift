@@ -1,11 +1,11 @@
 import Arguments
 
-/// Offline, embedded workflow reference; does not require a workspace checkout.
-public enum SwiftHelpCommand: ArgumentCommand {
-    public static let name = "help"
+/// Embedded workflow reference exposed as `sbm docs workflows`; native `help` remains owned by Arguments.
+public enum SwiftDocsCommand: ArgumentCommand {
+    public static let name = "docs"
 
     public static let children: [ArgumentCommandType] = [
-        SwiftHelpWorkflowsCommand.self,
+        SwiftDocsWorkflowsCommand.self,
     ]
 
     public static func components() throws -> [CommandComponentLowerable] {
@@ -13,7 +13,7 @@ public enum SwiftHelpCommand: ArgumentCommand {
     }
 }
 
-public enum SwiftHelpWorkflowsCommand: RunnableArgumentCommand {
+public enum SwiftDocsWorkflowsCommand: RunnableArgumentCommand {
     public static let name = "workflows"
 
     public static func components() throws -> [CommandComponentLowerable] {
@@ -32,7 +32,7 @@ public enum SwiftHelpWorkflowsCommand: RunnableArgumentCommand {
     Package paths in packages { } are relative to the workspace root.
 
     COMMANDS
-      sbm help workflows
+      sbm docs workflows
       sbm wf list [--workspace PATH]
       sbm wf show NAME [--workspace PATH]
       sbm wf run NAME [--workspace PATH] [--dry-run]

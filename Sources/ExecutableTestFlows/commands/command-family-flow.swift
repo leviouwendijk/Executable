@@ -33,17 +33,35 @@ extension ExecutableFlowSuite {
                 }
             }
 
-            Step("embedded workflow help command is registered and discoverable") {
+            Step("embedded workflow docs dispatch without shadowing native help") {
                 let spec = try SwiftBuildManagerCommand.spec()
+                let names = spec.children.map(\.name.rawValue)
+                try Expect.true(names.contains("docs"), "docs command is registered")
+                try Expect.false(names.contains("help"), "native help is not shadowed")
+
                 let invocation = try Arguments.parse(
-                    ["help", "workflows"],
+                    ["docs", "workflows"],
                     spec: spec
                 )
                 try Expect.equal(
                     invocation.commandPath.map(\.rawValue),
-                    ["sbm", "help", "workflows"],
-                    "built-in workflow help resolves without workspace lookup"
+                    ["sbm", "docs", "workflows"],
+                    "docs workflow topic resolves through normal command parsing"
                 )
+
+                for arguments in [
+                    ["docs", "workflows"],
+                    ["help", "wf"],
+                    ["wf", "run", "--help"],
+                ] {
+                    let exit = await SwiftBuildManagerCommand.run(arguments: arguments)
+                    try Expect.equal(
+                        exit,
+                        Int32(0),
+                        "CLI dispatch succeeds: \(arguments.joined(separator: " "))"
+                    )
+                }
+
                 for phrase in [
                     ".sbm/workflows.pkl",
                     "--execute",
@@ -53,8 +71,8 @@ extension ExecutableFlowSuite {
                     "needs",
                 ] {
                     try Expect.true(
-                        SwiftHelpWorkflowsCommand.reference.contains(phrase),
-                        "embedded workflow help documents \(phrase)"
+                        SwiftDocsWorkflowsCommand.reference.contains(phrase),
+                        "embedded workflow docs contain \(phrase)"
                     )
                 }
             }

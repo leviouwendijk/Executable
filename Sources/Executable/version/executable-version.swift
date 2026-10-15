@@ -1,7 +1,7 @@
 import Foundation
 import Interfaces
 import Version
-import plate
+// import plate
 
 public enum ExecutableVersion {
     public struct Snapshot: Sendable {
