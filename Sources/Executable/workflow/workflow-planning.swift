@@ -136,10 +136,7 @@ public enum WorkflowPlanning {
 
         var planned: [Stage] = []
         for stage in declared {
-            guard let raw = workspace.configuration.packages[stage.package] else {
-                throw WorkflowConfigurationError.missingPackage(stage.package)
-            }
-            let directory = try packageURL(raw, in: workspace.root)
+            let directory = try packageDirectory(stage.package, in: workspace)
             var operations: [Operation] = []
             if stage.update != nil || defaults?.update != nil {
                 let when = try condition(stage.update?.when ?? defaults?.update?.when ?? "always", allowed: [.always, .never, .dependencyStale])
@@ -206,6 +203,17 @@ public enum WorkflowPlanning {
         let start = CharacterSet.letters.union(CharacterSet(charactersIn: "_"))
         let remainder = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
         return start.contains(first) && text.unicodeScalars.dropFirst().allSatisfy(remainder.contains)
+    }
+
+    /// Reuse the workflow compiler's alias and containment rules for single-package actions.
+    public static func packageDirectory(_ reference: String, in workspace: Workspace) throws -> URL {
+        guard validIdentifier(reference) else {
+            throw WorkflowConfigurationError.invalidName(reference)
+        }
+        guard let raw = workspace.configuration.packages[reference] else {
+            throw WorkflowConfigurationError.missingPackage(reference)
+        }
+        return try packageURL(raw, in: workspace.root)
     }
 
     private static func packageURL(_ raw: String, in root: URL) throws -> URL {

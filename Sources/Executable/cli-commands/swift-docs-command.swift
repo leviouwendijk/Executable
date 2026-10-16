@@ -107,6 +107,24 @@ public enum SwiftDocsWorkflowsCommand: RunnableArgumentCommand {
       --from is planning-only; executing from a later stage is unsupported.
       Automatic rollback and resume are not implemented. Git pushes are real.
 
+    SINGLE-PACKAGE ACTIONS
+      sbm pkg runtime update
+      sbm p runtime update -v            # update -> build -> tests.primary
+      sbm pkg runtime verify             # build -> tests.primary
+      sbm p runtime ship -m "Fix runtime" --stage-all
+      sbm pkg runtime update --ship -m "Refresh deps" --stage-all
+      sbm pkg runtime ship --dry-run
+      --workspace PATH selects a workspace explicitly.
+      --configuration debug|release selects build mode (debug default).
+      --branch BRANCH sets the expected Git branch (master default).
+      Package aliases come from packages { }, not stage ids; no `needs` run.
+      `update` means SwiftPM dependency update (unlike top-level sbm update).
+      Ship always builds and runs declared tests.primary before commit/push.
+      Shipping requires --stage-all and --message/-m for real execution.
+      The existing Git publisher stages every change (`git add -- .`).
+      Verify and ship fail closed if tests.primary is not configured.
+      --dry-run previews without executing or requiring --stage-all.
+
     EXAMPLE EXECUTION
       sbm wf run agentic_debug --dry-run
       sbm wf run agentic_debug --execute --publish --message "Finalize Agentic integration"
