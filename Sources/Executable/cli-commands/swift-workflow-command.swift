@@ -69,6 +69,7 @@ public enum SwiftWorkflowRunCommand: RunnableArgumentCommand {
             flag("dry-run", help: "Resolve and present the plan without performing operations."),
             flag("execute", help: "Execute workflow operations rather than previewing them."),
             flag("publish", help: "Explicitly permit workflow Git commit and push operations."),
+            flag("verbose", help: "Print captured successful operation output; use append-only rendering."),
         ]
     }
     public static func run(_ invocation: ParsedInvocation) async throws {
@@ -89,7 +90,10 @@ public enum SwiftWorkflowRunCommand: RunnableArgumentCommand {
         }
         guard startID == nil else { throw WorkflowConfigurationError.executionFromUnsupported }
         let message = try invocation.value("message", as: String.self)
-        try await WorkflowExecution.execute(plan, message: message, allowPublish: allowPublish)
+        try await WorkflowTimelinePresentation.run(
+            plan, message: message, allowPublish: allowPublish,
+            verbose: try invocation.flag("verbose")
+        )
     }
 }
 

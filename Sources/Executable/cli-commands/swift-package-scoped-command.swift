@@ -21,6 +21,7 @@ public enum SwiftPackageScopedCommand: RunnableArgumentCommand {
             flag("ship", help: "After update, build, test, commit and push."),
             flag("stage-all", help: "Explicitly authorize the Git publisher's git add -- . behavior."),
             flag("dry-run", help: "Show the package operation plan without executing."),
+            flag("verbose", help: "Print captured successful operation output; use append-only rendering."),
         ]
     }
 
@@ -82,6 +83,9 @@ public enum SwiftPackageScopedCommand: RunnableArgumentCommand {
         if publishes {
             print("Package publish authorized (--stage-all): git add -- . may include unrelated changes in \(reference).")
         }
-        try await WorkflowExecution.execute(plan, message: message, allowPublish: publishes)
+        try await WorkflowTimelinePresentation.run(
+            plan, message: message, allowPublish: publishes,
+            verbose: try invocation.flag("verbose")
+        )
     }
 }

@@ -16,12 +16,17 @@ public enum Resolve {
     }
 
     @discardableResult
+    public static func getCaptured(at dir: URL) async throws -> Result {
+        try await runSwiftPackage(subcommand: "update", in: dir, streamOutput: false)
+    }
+
+    @discardableResult
     public static func resolve(at dir: URL) async throws -> Result {
         try await runSwiftPackage(subcommand: "resolve", in: dir)
     }
 
     @discardableResult
-    private static func runSwiftPackage(subcommand: String, in dir: URL) async throws -> Result {
+    private static func runSwiftPackage(subcommand: String, in dir: URL, streamOutput: Bool = true) async throws -> Result {
         // light paint, consistent with Build
         let colorables: [ColorableString] = [
             .init(selection: ["warning", "Warning"], colors: [.yellow]),
@@ -82,13 +87,15 @@ public enum Resolve {
                 outputLimit: .max
             ),
             onStdout: { chunk in
-                await streamer.ingest(
-                    chunk
-                )
+                if streamOutput {
+                    await streamer.ingest(chunk)
+                }
             }
         )
 
-        await streamer.flush()
+        if streamOutput {
+            await streamer.flush()
+        }
 
         let code: Int32
 

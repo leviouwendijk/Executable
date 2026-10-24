@@ -174,15 +174,7 @@ public enum WorkflowPlanning {
     }
 
     public static func present(_ plan: Plan) {
-        print("Workflow: \(plan.name) [resolved plan; no operations performed]")
-        print("Workspace: \(plan.root.path)")
-        print("Configuration: \(plan.source.path)")
-        for (index, stage) in plan.stages.enumerated() {
-            print("\(index + 1). \(stage.id) [\(stage.package)] → \(stage.directory.path)")
-            if !stage.needs.isEmpty { print("   needs: \(stage.needs.joined(separator: ", "))") }
-            for operation in stage.operations { print("   • \(operation.description)") }
-        }
-        print("No workflow operations were executed.")
+        WorkflowTimelinePresentation.present(plan)
     }
 
     private static func condition(_ name: String, allowed: Set<Condition>) throws -> Condition {
