@@ -78,7 +78,46 @@ public struct WorkflowConfiguration: Decodable, Sendable {
                 }
             }
         }
-        return try PklCoding(duplicateKeyStrategy: .reject).decode(Self.self, from: document)
+        // Normalize package namespaces without changing the public flat registry.
+        let normalized = try Pkl.Document(entries: document.entries.map { entry in
+            guard entry.name == "packages" else { return entry }
+            return Pkl.Entry(
+                name: entry.name,
+                value: .block(try flattenedPackages(block(entry))),
+                range: entry.range
+            )
+        })
+        return try PklCoding(duplicateKeyStrategy: .reject).decode(Self.self, from: normalized)
+    }
+
+    private static func flattenedPackages(_ entries: [Pkl.Entry]) throws -> [Pkl.Entry] {
+        var result: [Pkl.Entry] = []
+        var references = Set<String>()
+
+        func visit(_ entries: [Pkl.Entry], prefix: [String]) throws {
+            var siblings = Set<String>()
+            for entry in entries {
+                let path = prefix + [entry.name]
+                let reference = path.joined(separator: ".")
+                guard siblings.insert(entry.name).inserted else {
+                    throw WorkflowConfigurationError.malformed("Duplicate package declaration '\(reference)'")
+                }
+                switch entry.value {
+                case .string:
+                    guard references.insert(reference).inserted else {
+                        throw WorkflowConfigurationError.malformed("Duplicate package reference '\(reference)'")
+                    }
+                    result.append(Pkl.Entry(name: reference, value: entry.value, range: entry.range))
+                case .block(let children):
+                    try visit(children, prefix: path)
+                default:
+                    throw WorkflowConfigurationError.malformed("Package '\(reference)' must be a string path or namespace block")
+                }
+            }
+        }
+
+        try visit(entries, prefix: [])
+        return result
     }
 
     private static func policies(_ entries: [Pkl.Entry]) throws {

@@ -51,6 +51,50 @@ extension ExecutableFlowSuite {
                     try Expect.true(true, "traversal rejected")
                 }
             }
+
+            Step("nested packages resolve from workflows and standalone package actions") {
+                let fixture = try TypedWorkflowFixture()
+                defer { fixture.remove() }
+                let nested = fixture.original
+                    .replacingOccurrences(
+                        of: "media = \"AgenticMedia\"",
+                        with: "agentic { subsystem { media = \"AgenticMedia\" } }"
+                    )
+                    .replacingOccurrences(of: "package = \"media\"", with: "package = \"agentic.subsystem.media\"")
+                try fixture.write(nested, to: ".sbm/workflows.pkl")
+                let workspace = try WorkflowPlanning.load(root: fixture.root)
+                try Expect.equal(workspace.configuration.packages["agentic.subsystem.media"], "AgenticMedia", "flattened nested package")
+                try Expect.equal(workspace.configuration.packages["runtime"], "AgenticRuntime", "flat package retained")
+                let plan = try await WorkflowPlanning.resolve("agentic_debug", in: workspace)
+                try Expect.equal(plan.stages[3].directory.lastPathComponent, "AgenticMedia", "qualified workflow stage resolves")
+                let standalone = try WorkflowPlanning.packageDirectory("agentic.subsystem.media", in: workspace)
+                try Expect.equal(standalone.lastPathComponent, "AgenticMedia", "standalone qualified package resolves")
+                for invalid in ["agentic..media", ".media", "agentic."] {
+                    do {
+                        _ = try WorkflowPlanning.packageDirectory(invalid, in: workspace)
+                        try Expect.false(true, "invalid qualified reference must fail")
+                    } catch WorkflowConfigurationError.invalidName {
+                        try Expect.true(true, "malformed qualified reference rejected")
+                    }
+                }
+                let duplicate = nested.replacingOccurrences(
+                    of: "media = \"AgenticMedia\"",
+                    with: "media = \"AgenticMedia\" media = \"Media\""
+                )
+                do {
+                    _ = try WorkflowConfiguration.parse(duplicate)
+                    try Expect.false(true, "duplicate nested package declaration must fail")
+                } catch WorkflowConfigurationError.malformed {
+                    try Expect.true(true, "duplicate declaration rejected")
+                }
+                let invalidValue = nested.replacingOccurrences(of: "media = \"AgenticMedia\"", with: "media = true")
+                do {
+                    _ = try WorkflowConfiguration.parse(invalidValue)
+                    try Expect.false(true, "non-string package leaf must fail")
+                } catch WorkflowConfigurationError.malformed {
+                    try Expect.true(true, "invalid package declaration rejected")
+                }
+            }
         }
     }
 

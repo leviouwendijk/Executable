@@ -185,7 +185,10 @@ public enum WorkflowPlanning {
     }
 
     private static func validateNames(in configuration: WorkflowConfiguration) throws {
-        for name in Array(configuration.packages.keys) + Array(configuration.workflows.keys) {
+        for name in configuration.packages.keys {
+            guard validPackageReference(name) else { throw WorkflowConfigurationError.invalidName(name) }
+        }
+        for name in configuration.workflows.keys {
             guard validIdentifier(name) else { throw WorkflowConfigurationError.invalidName(name) }
         }
     }
@@ -197,9 +200,15 @@ public enum WorkflowPlanning {
         return start.contains(first) && text.unicodeScalars.dropFirst().allSatisfy(remainder.contains)
     }
 
+    private static func validPackageReference(_ text: String) -> Bool {
+        text.split(separator: ".", omittingEmptySubsequences: false).allSatisfy {
+            validIdentifier(String($0))
+        }
+    }
+
     /// Reuse the workflow compiler's alias and containment rules for single-package actions.
     public static func packageDirectory(_ reference: String, in workspace: Workspace) throws -> URL {
-        guard validIdentifier(reference) else {
+        guard validPackageReference(reference) else {
             throw WorkflowConfigurationError.invalidName(reference)
         }
         guard let raw = workspace.configuration.packages[reference] else {
