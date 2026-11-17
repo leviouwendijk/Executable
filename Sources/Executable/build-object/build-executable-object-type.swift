@@ -1,7 +1,7 @@
 import Foundation
 import Version
 
-public enum ExecutableObjectType: String, RawRepresentable, Codable, Sendable {
+public enum ExecutableObjectType: String, RawRepresentable, Codable, Sendable, CaseIterable {
     case binary
     case application
     case script

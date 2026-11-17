@@ -61,9 +61,7 @@ public enum SwiftRemoteSetCommand: BoundArgumentCommand {
             options.project
         )
 
-        let objectURL = try BuildObjectDiscovery.requireLocal(
-            named: "build-object.pkl", in: directory
-        )
+        let objectURL = try BuildObjectDiscovery.requireConfiguration(in: directory)
 
         var configuration = try BuildObjectConfiguration(
             from: objectURL
@@ -82,7 +80,7 @@ public enum SwiftRemoteSetCommand: BoundArgumentCommand {
 
         let remoteURL = try await GitRepo.remoteRawBuildObjectURL(
             directory,
-            file: "build-object.pkl"
+            file: objectURL.lastPathComponent
         )
 
         configuration = .init(
@@ -93,7 +91,8 @@ public enum SwiftRemoteSetCommand: BoundArgumentCommand {
             compile: configuration.compile,
             details: configuration.details,
             author: configuration.author,
-            update: remoteURL
+            update: remoteURL,
+            tests: configuration.tests
         )
 
         try configuration.write(

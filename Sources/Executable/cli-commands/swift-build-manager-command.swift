@@ -26,6 +26,7 @@ public enum SwiftBuildManagerCommand: ArgumentCommand {
         SwiftModernizeCommand.self,
         SwiftVersionCommand.self,
         SwiftRemoteCommand.self,
+        SwiftFrameModuleCommand.self,
     ]
 
     public static func components() throws -> [CommandComponentLowerable] {

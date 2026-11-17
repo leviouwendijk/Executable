@@ -214,29 +214,16 @@ public enum Build {
     private static func updateBuiltVersionSnapshot(at dir: URL, argv: [String]? = nil) throws {
         let project = dir.standardizedFileURL
         // No local build-object means no local snapshot. Never adopt parent metadata.
-        guard let objectURL = try BuildObjectDiscovery.local(
-            named: "build-object.pkl", in: project
-        ) else { return }
+        guard let objectURL = try BuildObjectDiscovery.configuration(in: project) else { return }
         let configuration = try BuildObjectConfiguration(from: objectURL)
         let release = configuration.versions.release
-        let compiledURL = project.appendingPathComponent("compiled.pkl")
+        let compiledURL = BuildObjectDiscovery.compiledURL(for: objectURL)
+        let compiledName = compiledURL.lastPathComponent
         try BuildObjectDiscovery.requireOwned(compiledURL, by: project)
-
-        let recordedArguments = argv ?? []
-        if let existing = try BuildObjectDiscovery.local(named: "compiled.pkl", in: project) {
-            let compiled = try CompiledLocalBuildObject(from: existing)
-            if compiled.version == release && compiled.arguments == recordedArguments {
-                print("compiled version and arguments unchanged")
-                print("no ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + " written".ansi(.brightBlack))
-                return
-            }
-            print("compiled version or arguments changed")
-            print("writing ".ansi(.brightBlack) + "compiled.pkl".ansi(.brightBlack, .bold) + "…".ansi(.brightBlack))
-        }
 
         // A symlinked .gitignore could otherwise mutate a file outside the project.
         try BuildObjectDiscovery.requireOwned(project.appendingPathComponent(".gitignore"), by: project)
-        let ignorable: [String] = ["compiled.pkl", "/compiled.pkl", "**/compiled.pkl"]
+        let ignorable: [String] = [compiledName, "/\(compiledName)", "**/\(compiledName)"]
         do {
             let (result, context) = try GitRepo.appending(
                 ignorable: ignorable, to: ".gitignore", in: project
@@ -255,6 +242,17 @@ public enum Build {
             fputs("note: could not update .gitignore: \(error)\n", stderr)
         }
 
+        let recordedArguments = argv ?? []
+        if let existing = try BuildObjectDiscovery.compiled(for: objectURL) {
+            let compiled = try CompiledLocalBuildObject(from: existing)
+            if compiled.version == release && compiled.arguments == recordedArguments {
+                print("compiled version and arguments unchanged")
+                print("no \(compiledName) written")
+                return
+            }
+            print("compiled version or arguments changed")
+        }
+        print("writing \(compiledName)…")
         let updated = CompiledLocalBuildObject(version: release, arguments: recordedArguments)
         try updated.write(to: compiledURL)
         print("compiled version += \(release.string(prefixStyle: .none))")

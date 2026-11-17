@@ -83,7 +83,7 @@ public enum SwiftRenewRepositoriesCommand: BoundArgumentCommand {
 
         if objects.isEmpty {
             print(
-                "No build-object.pkl projects detected under root.".ansi(.yellow)
+                "No build.frame or build-object.pkl projects detected under root.".ansi(.yellow)
             )
             return
         }

@@ -22,6 +22,7 @@ let package = Package(
 
         // fast test suite
         .executable(name: "t_executable", targets: ["ExecutableTests"]),
+        .executable(name: "t_executable_frame", targets: ["ExecutableFrameTests"]),
     ],
     dependencies: [
         .package(
@@ -53,6 +54,7 @@ let package = Package(
             branch: "master"
         ),
         .package(url: "https://github.com/leviouwendijk/Parsers.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/Frame.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Testing.git", branch: "master"),
         .package(
             url: "https://github.com/leviouwendijk/Arguments.git",
@@ -80,6 +82,7 @@ let package = Package(
                 .product(name: "Primitives", package: "Primitives"),
                 .product(name: "Version", package: "Version"),
                 .product(name: "Parsers", package: "Parsers"),
+                .product(name: "Frame", package: "Frame"),
                 .product(name: "Arguments", package: "Arguments"),
             ]
         ),
@@ -90,6 +93,15 @@ let package = Package(
                 .product(name: "Testing", package: "Testing"),
             ],
             path: "Testing/ExecutableTests"
+        ),
+        .executableTarget(
+            name: "ExecutableFrameTests",
+            dependencies: [
+                "Executable",
+                .product(name: "Frame", package: "Frame"),
+                .product(name: "Testing", package: "Testing")
+            ],
+            path: "Testing/ExecutableFrameTests"
         ),
         .executableTarget(
             name: "ExecutableTestFlows",

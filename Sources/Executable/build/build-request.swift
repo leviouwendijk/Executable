@@ -22,8 +22,8 @@ public extension Build {
                 case .direct:
                     return "direct invocation"
 
-                case .buildObject:
-                    return "build-object.pkl"
+                case .buildObject(let url, _):
+                    return url.lastPathComponent
                 }
             }
         }

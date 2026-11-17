@@ -9,7 +9,7 @@ public enum Tests {
         public var errorDescription: String? {
             switch self {
             case .notConfigured(let project):
-                return "No tests { } declaration in \(project.appendingPathComponent("build-object.pkl").path)."
+                return "No tests { } declaration in the build configuration at \(project.path)."
             case .failed(let product, let code, let signal):
                 return "Test product '\(product)' failed (exit: \(String(describing: code)), signal: \(String(describing: signal)))."
             }
@@ -30,7 +30,7 @@ public enum Tests {
         selection: TestConfiguration.Selection = .primary
     ) async throws -> Plan {
         let project = project.standardizedFileURL
-        let source = try BuildObjectDiscovery.requireLocal(named: "build-object.pkl", in: project)
+        let source = try BuildObjectDiscovery.requireConfiguration(in: project)
         let configuration = try BuildObjectConfiguration(from: source)
         guard let tests = configuration.tests else { throw RunError.notConfigured(project) }
         let available = Set(try await Products.executableNames(in: project))

@@ -13,7 +13,7 @@ public enum SwiftConfigCommand: ArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Manage build-object.pkl"
+                "Manage build.frame (legacy build-object.pkl supported)"
             ),
         ]
     }
@@ -51,7 +51,7 @@ public enum SwiftConfigInitCommand: BoundArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Create build-object.pkl in the current directory"
+                "Create build.frame in the current directory (preserves existing Pkl projects)"
             ),
             try params(
                 Options.self
@@ -63,12 +63,14 @@ public enum SwiftConfigInitCommand: BoundArgumentCommand {
         _ options: Options,
         invocation: ParsedInvocation
     ) async throws {
-        let object = existence(
-            of: "build-object.pkl"
+        let directory = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
         )
-
+        let existing = try BuildObjectDiscovery.configuration(in: directory)
+        let object = existence(of: existing?.lastPathComponent ?? "build.frame")
         let compiled = existence(
-            of: "compiled.pkl"
+            of: BuildObjectDiscovery.compiledName(for: object.url)
         )
 
         if !object.exists {
@@ -76,21 +78,19 @@ public enum SwiftConfigInitCommand: BoundArgumentCommand {
                 try BuildObjectConfiguration.new(
                     to: object.url
                 )
-                print("Created empty build-object.pkl")
-                return
+                print("Created empty \(object.url.lastPathComponent)")
+            } else {
+                try await setup(at: object.url)
             }
-
-            try await setup(
-                at: object.url
-            )
         }
 
         if !compiled.exists {
             try CompiledLocalBuildObject.new(
                 to: compiled.url
             )
-            print("Created empty compiled.pkl")
+            print("Created empty \(compiled.url.lastPathComponent)")
         }
+        try BuildObjectIgnore.ensure(for: object.url)
     }
 }
 
@@ -165,7 +165,7 @@ private extension SwiftConfigInitCommand {
         do {
             update = try await GitRepo.remoteRawBuildObjectURL(
                 directory,
-                file: "build-object.pkl"
+                file: buildObjectURL.lastPathComponent
             )
             print("Detected remote build-object URL:")
             print("  \(update)")
@@ -199,6 +199,6 @@ private extension SwiftConfigInitCommand {
         try configuration.write(
             to: buildObjectURL
         )
-        print("Created build-object.pkl")
+        print("Created \(buildObjectURL.lastPathComponent)")
     }
 }

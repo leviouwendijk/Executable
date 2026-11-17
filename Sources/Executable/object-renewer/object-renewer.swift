@@ -168,17 +168,13 @@ public struct ObjectRenewer: Sendable {
         // }
 
         if compilable {
-            let obj_url = try BuildObjectDiscovery.requireLocal(
-                named: "build-object.pkl", in: resolvedPaths.directory
-            )
+            let obj_url = try BuildObjectDiscovery.requireConfiguration(in: resolvedPaths.directory)
             let obj = try BuildObjectConfiguration(from: obj_url)
 
             let v_release = obj.versions.release
 
             // soft try to get compiled.pkl
-            let compl_url_soft = try BuildObjectDiscovery.local(
-                named: "compiled.pkl", in: resolvedPaths.directory
-            )
+            let compl_url_soft = try BuildObjectDiscovery.compiled(for: obj_url)
 
             var reasonToCompile = false
 
@@ -199,7 +195,7 @@ public struct ObjectRenewer: Sendable {
                     printi("release:    \(v_release.string(prefixStyle: .none))", times: 2)
                 }
             } else {
-                printi("No compiled.pkl detected; compiling…")
+                printi("No \(BuildObjectDiscovery.compiledName(for: obj_url)) detected; compiling…")
                 reasonToCompile = true
             }
 
@@ -522,10 +518,10 @@ extension ObjectRenewer {
             guard !seenDirs.contains(dirPath) else { return }
             seenDirs.insert(dirPath)
 
-            // If it has a build-object.pkl, it's compilable; otherwise it's not.
-            let compilable = fm.fileExists(
-                atPath: dir.appendingPathComponent("build-object.pkl").path
-            )
+            // Both configuration formats identify compilable projects.
+            let compilable = ["build.frame", "build-object.pkl"].contains {
+                fm.fileExists(atPath: dir.appendingPathComponent($0).path)
+            }
 
             results.append(
                 RenewableObject(
@@ -538,8 +534,10 @@ extension ObjectRenewer {
             )
         }
 
-        // If root itself has a build-object.pkl, treat it as a project.
-        if fm.fileExists(atPath: root.appendingPathComponent("build-object.pkl").path) {
+        // Include the root when either configuration format exists.
+        if ["build.frame", "build-object.pkl"].contains(where: {
+            fm.fileExists(atPath: root.appendingPathComponent($0).path)
+        }) {
             registerProject(at: root)
         }
 
@@ -558,7 +556,7 @@ extension ObjectRenewer {
                 continue
             }
 
-            if url.lastPathComponent == "build-object.pkl" {
+            if url.lastPathComponent == "build.frame" || url.lastPathComponent == "build-object.pkl" {
                 let dir = url.deletingLastPathComponent()
                 registerProject(at: dir)
             }

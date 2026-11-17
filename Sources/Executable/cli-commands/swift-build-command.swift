@@ -42,7 +42,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
         @Flag(
             "inherit-ancestor",
-            help: "Opt in to a parent build-object.pkl. Shows the path and requires interactive 'yes' confirmation."
+            help: "Opt in to a parent build.frame or build-object.pkl. Requires interactive 'yes' confirmation."
         )
         public var inheritAncestor: Bool
 
@@ -157,12 +157,10 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             let directory = options.project.map {
                 URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
             } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-            let local = try BuildObjectDiscovery.local(named: "build-object.pkl", in: directory)
+            let local = try BuildObjectDiscovery.configuration(in: directory)
             var approvedAncestor: URL?
             if local == nil,
-               let candidate = try? BuildObjectDiscovery.nearest(
-                   named: "build-object.pkl", from: directory, maxDepth: 5
-               ) {
+               let candidate = try? BuildObjectDiscovery.nearestConfiguration(from: directory, maxDepth: 5) {
                 print("Project: \(directory.path)")
                 print("Ancestor configuration: \(candidate.path)")
                 print("Apply its build arguments to this project? Type 'yes' to confirm:")
@@ -205,14 +203,12 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         approvedAncestorConfiguration: URL? = nil
     ) throws -> Build.Request {
         let root = directory.standardizedFileURL
-        let local = try BuildObjectDiscovery.local(named: "build-object.pkl", in: root)
+        let local = try BuildObjectDiscovery.configuration(in: root)
         let objectURL: URL?
         if let local {
             objectURL = local
         } else if let approvedAncestorConfiguration {
-            let candidate = try BuildObjectDiscovery.nearest(
-                named: "build-object.pkl", from: root, maxDepth: 5
-            )
+            let candidate = try BuildObjectDiscovery.nearestConfiguration(from: root, maxDepth: 5)
             guard candidate.standardizedFileURL == approvedAncestorConfiguration.standardizedFileURL else {
                 throw BuildObjectDiscoveryError.ancestorNotApproved(approvedAncestorConfiguration)
             }

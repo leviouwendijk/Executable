@@ -88,16 +88,10 @@ public enum BuildObjectLifecycle {
     public static func initializeEmpty(
         at directory: URL
     ) throws -> InitializeResult {
-        let configurationURL = directory
-            .standardizedFileURL
-            .appendingPathComponent(
-                "build-object.pkl"
-            )
-        let compiledURL = directory
-            .standardizedFileURL
-            .appendingPathComponent(
-                "compiled.pkl"
-            )
+        let project = directory.standardizedFileURL
+        let configurationURL = try BuildObjectDiscovery.configuration(in: project)
+            ?? project.appendingPathComponent("build.frame")
+        let compiledURL = BuildObjectDiscovery.compiledURL(for: configurationURL)
         let fileManager = FileManager.default
         var createdConfiguration = false
         var createdCompiled = false
@@ -120,6 +114,7 @@ public enum BuildObjectLifecycle {
             createdCompiled = true
         }
 
+        try BuildObjectIgnore.ensure(for: configurationURL)
         return .init(
             configurationURL: configurationURL,
             compiledURL: compiledURL,
@@ -133,12 +128,9 @@ public enum BuildObjectLifecycle {
         request: InitializeRequest
     ) throws -> InitializeResult {
         let directory = directory.standardizedFileURL
-        let configurationURL = directory.appendingPathComponent(
-            "build-object.pkl"
-        )
-        let compiledURL = directory.appendingPathComponent(
-            "compiled.pkl"
-        )
+        let configurationURL = try BuildObjectDiscovery.configuration(in: directory)
+            ?? directory.appendingPathComponent("build.frame")
+        let compiledURL = BuildObjectDiscovery.compiledURL(for: configurationURL)
         let fileManager = FileManager.default
         var createdConfiguration = false
         var createdCompiled = false
@@ -203,6 +195,7 @@ public enum BuildObjectLifecycle {
             createdCompiled = true
         }
 
+        try BuildObjectIgnore.ensure(for: configurationURL)
         return .init(
             configurationURL: configurationURL,
             compiledURL: compiledURL,

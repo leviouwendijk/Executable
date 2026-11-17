@@ -3,6 +3,52 @@ import Path
 
 /// Domain-specific filename lookup; the ancestor algorithm is supplied by Path/IO.
 public enum BuildObjectDiscovery {
+    public static let preferredConfiguration = "build.frame"
+    public static let legacyConfiguration = "build-object.pkl"
+
+    public static func configuration(in project: URL) throws -> URL? {
+        if let frame = try local(named: preferredConfiguration, in: project) { return frame }
+        return try local(named: legacyConfiguration, in: project)
+    }
+
+    public static func requireConfiguration(in project: URL) throws -> URL {
+        if let configuration = try configuration(in: project) { return configuration }
+        throw BuildObjectDiscoveryError.notFound(
+            filename: "build.frame or build-object.pkl", maxDepth: 1, startURL: project
+        )
+    }
+
+    public static func nearestConfiguration(
+        from startURL: URL = Bundle.main.bundleURL,
+        maxDepth: Int = 5
+    ) throws -> URL {
+        guard maxDepth > 0,
+              let ancestor = PathAncestorSearch.nearestAncestorContainingAny(
+                [preferredConfiguration, legacyConfiguration],
+                startingAt: startURL,
+                treatingStartAsDirectory: true,
+                includingStart: true,
+                maxDepth: maxDepth - 1
+              ) else {
+            throw BuildObjectDiscoveryError.notFound(
+                filename: "build.frame or build-object.pkl", maxDepth: maxDepth, startURL: startURL
+            )
+        }
+        return try requireConfiguration(in: ancestor)
+    }
+
+    public static func compiledName(for configuration: URL) -> String {
+        configuration.lastPathComponent == preferredConfiguration ? "compiled.frame" : "compiled.pkl"
+    }
+
+    public static func compiledURL(for configuration: URL) -> URL {
+        configuration.deletingLastPathComponent().appendingPathComponent(compiledName(for: configuration))
+    }
+
+    public static func compiled(for configuration: URL) throws -> URL? {
+        try local(named: compiledName(for: configuration), in: configuration.deletingLastPathComponent())
+    }
+
     /// Resolve a file only in the designated project directory, never an ancestor.
     /// PathAncestorSearch delegates existence checks to IO.FileSystem.
     public static func local(named filename: String, in project: URL) throws -> URL? {
