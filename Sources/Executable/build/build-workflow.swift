@@ -247,7 +247,8 @@ public extension Build {
                 config: plan.request.config,
                 to: plan.request.destination,
                 products: plan.selectedProductNames,
-                perProductDestinations: plan.perProductDestinations
+                perProductDestinations: plan.perProductDestinations,
+                identity: await BuildIdentity.current(at: plan.request.project)
             )
         }
 

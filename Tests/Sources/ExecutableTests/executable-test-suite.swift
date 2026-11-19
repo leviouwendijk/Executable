@@ -5,5 +5,6 @@ enum ExecutableTestSuite {
         pklRegressionSuite
         discoverySuite
         remoteBuildObjectSuite
+        releaseTagsSuite
     }
 }

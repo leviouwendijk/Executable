@@ -99,7 +99,8 @@ public enum SignedDeployment {
             config: .init(mode: request.configuration),
             to: request.destination,
             products: [request.product],
-            perProductDestinations: [:]
+            perProductDestinations: [:],
+            identity: await BuildIdentity.current(at: request.project)
         )
 
         let deployedVerification = try await CodeSigning.verify(

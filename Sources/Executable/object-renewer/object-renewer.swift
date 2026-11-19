@@ -167,11 +167,15 @@ public struct ObjectRenewer: Sendable {
         //     throw ObjectRenewerError.compilableNotConfigured(object.path)
         // }
 
-        if compilable,
-           try BuildObjectDiscovery.configuration(in: resolvedPaths.directory)?.lastPathComponent == BuildObjectDiscovery.preferredConfiguration {
-            // Versions for package.frame projects come from git tags; until then, always rebuild.
-            printi("package.frame project; compiling…")
-            try await execute(in: resolvedPaths.directory)
+        if compilable, let package = try PackageFrame.package(in: resolvedPaths.directory) {
+            // The release is the newest tag; each deployed product's metadata says what it was built from.
+            let status = try await PackageVersionStatus.inspect(at: resolvedPaths.directory, configuration: package)
+            if status.behind.isEmpty {
+                printi("Deployed products are current; skipping compile.")
+            } else {
+                printi("Behind the release (\(status.release.map(ReleaseTags.name(for:)) ?? "untagged")): \(status.behind.joined(separator: ", ")); compiling…")
+                try await execute(in: resolvedPaths.directory)
+            }
         } else if compilable {
             let obj_url = try BuildObjectDiscovery.requireConfiguration(in: resolvedPaths.directory)
             let obj = try BuildObjectConfiguration(from: obj_url)

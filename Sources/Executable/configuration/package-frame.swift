@@ -66,6 +66,13 @@ public enum PackageFrame {
         try BuildObjectFile.read(from: url, decoding: parse)
     }
 
+    /// The `package` binding beside a Package.swift, or nil when the directory has no package.frame.
+    public static func package(in directory: URL) throws -> PackageConfiguration? {
+        guard let file = try BuildObjectDiscovery.local(named: fileName, in: directory) else { return nil }
+        guard case .package(let package) = try read(file) else { throw PackageFrameError.not_a_package(file) }
+        return package
+    }
+
     public static func source(_ package: PackageConfiguration) throws -> String {
         try source("package", ofType: "Package", PackageFields(
             build: package.buildArguments.isEmpty ? nil : .init(arguments: package.buildArguments),

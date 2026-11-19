@@ -1,5 +1,5 @@
 {
-  "originHash" : "a54fe3df68ac38eb32945c44ee0386edea354f3bd068ebaa1e6a28a5339af3a9",
+  "originHash" : "2ab95d7f4b466109880862a99e2bb78e316784d877602dae1edb5d101e2d779e",
   "pins" : [
     {
       "identity" : "ansi",
@@ -196,7 +196,7 @@
       "location" : "https://github.com/leviouwendijk/Path.git",
       "state" : {
         "branch" : "master",
-        "revision" : "dc0a6c12fb51692b1f3f4eb29c138d06de7e8eef"
+        "revision" : "51d13fcd2cab1b1d420b9fadaef5d5f7a2c1191b"
       }
     },
     {
@@ -251,6 +251,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "2ef45291376aa3b4e868d963acde506891be4769"
+      }
+    },
+    {
+      "identity" : "readers",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Readers.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b18e26bea8f185156a386848d760f4de310aa617"
       }
     },
     {

@@ -58,18 +58,18 @@ extension ExecutableFlowSuite {
                 let nested = fixture.original
                     .replacingOccurrences(
                         of: "media = \"AgenticMedia\"",
-                        with: "agentic { subsystem { media = \"AgenticMedia\" } }"
+                        with: "suite { subsystem { media = \"AgenticMedia\" } }"
                     )
-                    .replacingOccurrences(of: "package = \"media\"", with: "package = \"agentic.subsystem.media\"")
+                    .replacingOccurrences(of: "package = \"media\"", with: "package = \"suite.subsystem.media\"")
                 try fixture.write(nested, to: ".sbm/workflows.pkl")
                 let workspace = try WorkflowPlanning.load(root: fixture.root)
-                try Expect.equal(workspace.configuration.packages["agentic.subsystem.media"], "AgenticMedia", "flattened nested package")
+                try Expect.equal(workspace.configuration.packages["suite.subsystem.media"], "AgenticMedia", "flattened nested package")
                 try Expect.equal(workspace.configuration.packages["runtime"], "AgenticRuntime", "flat package retained")
                 let plan = try await WorkflowPlanning.resolve("agentic_debug", in: workspace)
                 try Expect.equal(plan.stages[3].directory.lastPathComponent, "AgenticMedia", "qualified workflow stage resolves")
-                let standalone = try WorkflowPlanning.packageDirectory("agentic.subsystem.media", in: workspace)
+                let standalone = try WorkflowPlanning.packageDirectory("suite.subsystem.media", in: workspace)
                 try Expect.equal(standalone.lastPathComponent, "AgenticMedia", "standalone qualified package resolves")
-                for invalid in ["agentic..media", ".media", "agentic."] {
+                for invalid in ["suite..media", ".media", "suite."] {
                     do {
                         _ = try WorkflowPlanning.packageDirectory(invalid, in: workspace)
                         try Expect.false(true, "invalid qualified reference must fail")
@@ -143,8 +143,8 @@ extension ExecutableFlowSuite {
                     try Expect.true(true, "test failure stops execution")
                 }
                 let events = await failed.events()
-                try Expect.true(events.contains("publish:Agentic"), "first stage was published")
-                try Expect.false(events.contains("publish:AgenticRuntime"), "failing stage cannot publish")
+                try Expect.true(events.contains { $0.hasPrefix("publish:Agentic:") }, "first stage was published")
+                try Expect.false(events.contains { $0.hasPrefix("publish:AgenticRuntime:") }, "failing stage cannot publish")
                 try Expect.false(events.contains("update:AgenticIO"), "next stage cannot start")
             }
         }

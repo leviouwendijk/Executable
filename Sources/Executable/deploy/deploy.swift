@@ -7,7 +7,8 @@ public enum Deploy {
     public static func all(
         from projectDir: URL,
         config: Build.Config,
-        to defaultDestination: URL
+        to defaultDestination: URL,
+        identity: BuildIdentity? = nil
     ) async throws {
         try ensureDir(
             defaultDestination
@@ -22,7 +23,8 @@ public enum Deploy {
                 productName: product.name,
                 from: projectDir,
                 config: config,
-                to: defaultDestination
+                to: defaultDestination,
+                identity: identity
             )
         }
     }
@@ -32,7 +34,8 @@ public enum Deploy {
         config: Build.Config,
         to defaultDestination: URL,
         products: [String],
-        perProductDestinations: [String: URL] = [:]
+        perProductDestinations: [String: URL] = [:],
+        identity: BuildIdentity? = nil
     ) throws {
         try ensureDir(
             defaultDestination
@@ -51,7 +54,8 @@ public enum Deploy {
                 productName: productName,
                 from: projectDir,
                 config: config,
-                to: destination
+                to: destination,
+                identity: identity
             )
         }
     }
@@ -84,7 +88,8 @@ public enum Deploy {
         productName: String,
         from projectDir: URL,
         config: Build.Config,
-        to destinationRoot: URL
+        to destinationRoot: URL,
+        identity: BuildIdentity?
     ) throws {
         let sourceURL = resolvedBuildProductURL(
             productName: productName,
@@ -182,7 +187,8 @@ public enum Deploy {
                 for: productName,
                 projectDir: projectDir,
                 config: config,
-                destinationRoot: destinationRoot
+                destinationRoot: destinationRoot,
+                identity: identity
             )
         } catch {
             print(
@@ -289,19 +295,20 @@ public enum Deploy {
         for productName: String,
         projectDir: URL,
         config: Build.Config,
-        destinationRoot: URL
+        destinationRoot: URL,
+        identity: BuildIdentity?
     ) throws {
         let metadataURL = destinationRoot
             .appendingPathComponent(
                 "\(productName).metadata"
             )
 
-        let content = """
-        ProjectRootPath=\(projectDir.path)
-        BuildType=\(config.buildDirComponent)
-        DeployedAt=\(ISO8601DateFormatter().string(from: Date()))
-        DestinationRoot=\(destinationRoot.path)
-        """
+        let content = ([
+            "ProjectRootPath=\(projectDir.path)",
+            "BuildType=\(config.buildDirComponent)",
+            "DeployedAt=\(ISO8601DateFormatter().string(from: Date()))",
+            "DestinationRoot=\(destinationRoot.path)",
+        ] + (identity?.metadataLines ?? [])).joined(separator: "\n")
 
         try content.write(
             to: metadataURL,

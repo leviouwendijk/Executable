@@ -196,7 +196,7 @@
       "location" : "https://github.com/leviouwendijk/Path.git",
       "state" : {
         "branch" : "master",
-        "revision" : "3ad6bcbfc000566cb37deff48d97adc93d2c94b3"
+        "revision" : "51d13fcd2cab1b1d420b9fadaef5d5f7a2c1191b"
       }
     },
     {
@@ -251,6 +251,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "2ef45291376aa3b4e868d963acde506891be4769"
+      }
+    },
+    {
+      "identity" : "readers",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Readers.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b18e26bea8f185156a386848d760f4de310aa617"
       }
     },
     {
