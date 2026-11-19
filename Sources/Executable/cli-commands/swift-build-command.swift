@@ -42,7 +42,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
         @Flag(
             "inherit-ancestor",
-            help: "Opt in to a parent build.frame or build-object.pkl. Requires interactive 'yes' confirmation."
+            help: "Opt in to a parent package.frame or build-object.pkl. Requires interactive 'yes' confirmation."
         )
         public var inheritAncestor: Bool
 
@@ -226,8 +226,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         }
 
         // Malformed local configuration is an error, not an invitation to search upwards.
-        let configuration = try BuildObjectConfiguration(from: objectURL)
-        guard configuration.compile.use else {
+        guard var arguments = try flaglessArguments(from: objectURL) else {
             return Build.Request(
                 project: root,
                 config: .init(mode: .release, updateBuiltOnSuccess: updateBuiltOnSuccess),
@@ -235,7 +234,6 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             )
         }
 
-        var arguments = configuration.compile.arguments
         if let first = arguments.first?.lowercased(), first == "build" || first == "sbm" {
             arguments.removeFirst()
         }
@@ -253,6 +251,17 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             defaultProject: root,
             updateBuiltOnSuccess: updateBuiltOnSuccess
         )
+    }
+
+    /// The flags a flagless `sbm build` uses, or nil for a plain release build without deploy.
+    /// A test package's package.frame builds plainly.
+    static func flaglessArguments(from configuration: URL) throws -> [String]? {
+        guard configuration.lastPathComponent == PackageFrame.fileName else {
+            let legacy = try BuildObjectConfiguration(from: configuration)
+            return legacy.compile.use ? legacy.compile.arguments : nil
+        }
+        guard case .package(let package) = try PackageFrame.read(configuration) else { return nil }
+        return package.flaglessArguments
     }
 
     public static func request(

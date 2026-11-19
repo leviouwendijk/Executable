@@ -1,0 +1,9 @@
+import Executable;
+
+let tests: Tests = .{
+    .primary = "t_executable",
+    .groups = .{
+        .frame = ["t_executable_frame"],
+        .flows = ["t_executable_flows"],
+    },
+};

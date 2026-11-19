@@ -27,9 +27,6 @@ public struct CompiledLocalBuildObject: Codable, Sendable {
     }
 
     public static func parse(from url: URL) throws -> CompiledLocalBuildObject {
-        try BuildObjectFile.read(from: url) { text in
-            if url.pathExtension == "frame" { return try Self.parseFrame(text) }
-            return try Self.parse(text)
-        }
+        try BuildObjectFile.read(from: url) { try Self.parse($0) }
     }
 }

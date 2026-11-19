@@ -49,7 +49,6 @@ public struct BuildObjectConfiguration: Codable, Sendable {
 
     public static func parse(from url: URL) throws -> BuildObjectConfiguration {
         try BuildObjectFile.read(from: url) { text in
-            if url.pathExtension == "frame" { return try Self.parseFrame(text) }
             return try Self.parse(text)
         }
     }

@@ -6,7 +6,7 @@ public enum SwiftFrameModuleCommand: RunnableArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Write the Executable Frame module, so editors complete and check build.frame"
+                "Write the Executable Frame module, so editors complete and check package.frame"
             ),
         ]
     }

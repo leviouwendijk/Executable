@@ -9,11 +9,14 @@ public enum BuildObjectLifecycle {
         LocalizedError
     {
         case invalidObjectType(String)
+        case packageFrameExists(URL)
 
         public var errorDescription: String? {
             switch self {
             case .invalidObjectType(let value):
                 return "Invalid executable object type '\(value)'."
+            case .packageFrameExists(let url):
+                return "\(url.path) already describes this project; build-object.pkl is legacy."
             }
         }
     }
@@ -89,8 +92,7 @@ public enum BuildObjectLifecycle {
         at directory: URL
     ) throws -> InitializeResult {
         let project = directory.standardizedFileURL
-        let configurationURL = try BuildObjectDiscovery.configuration(in: project)
-            ?? project.appendingPathComponent("build.frame")
+        let configurationURL = try legacyConfiguration(in: project)
         let compiledURL = BuildObjectDiscovery.compiledURL(for: configurationURL)
         let fileManager = FileManager.default
         var createdConfiguration = false
@@ -114,7 +116,6 @@ public enum BuildObjectLifecycle {
             createdCompiled = true
         }
 
-        try BuildObjectIgnore.ensure(for: configurationURL)
         return .init(
             configurationURL: configurationURL,
             compiledURL: compiledURL,
@@ -128,8 +129,7 @@ public enum BuildObjectLifecycle {
         request: InitializeRequest
     ) throws -> InitializeResult {
         let directory = directory.standardizedFileURL
-        let configurationURL = try BuildObjectDiscovery.configuration(in: directory)
-            ?? directory.appendingPathComponent("build.frame")
+        let configurationURL = try legacyConfiguration(in: directory)
         let compiledURL = BuildObjectDiscovery.compiledURL(for: configurationURL)
         let fileManager = FileManager.default
         var createdConfiguration = false
@@ -195,7 +195,6 @@ public enum BuildObjectLifecycle {
             createdCompiled = true
         }
 
-        try BuildObjectIgnore.ensure(for: configurationURL)
         return .init(
             configurationURL: configurationURL,
             compiledURL: compiledURL,
@@ -254,6 +253,15 @@ public enum BuildObjectLifecycle {
             modernized: true,
             backupURL: backupURL
         )
+    }
+}
+
+private extension BuildObjectLifecycle {
+    static func legacyConfiguration(in project: URL) throws -> URL {
+        if let frame = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.preferredConfiguration, in: project) {
+            throw Error.packageFrameExists(frame)
+        }
+        return project.appendingPathComponent(BuildObjectDiscovery.legacyConfiguration)
     }
 }
 

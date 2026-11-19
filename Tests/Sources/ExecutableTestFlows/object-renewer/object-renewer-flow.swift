@@ -1,4 +1,4 @@
-import Executable
+@_spi(Testing) import Executable
 import Foundation
 import TestFlows
 

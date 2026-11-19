@@ -214,7 +214,10 @@ public enum Build {
     private static func updateBuiltVersionSnapshot(at dir: URL, argv: [String]? = nil) throws {
         let project = dir.standardizedFileURL
         // No local build-object means no local snapshot. Never adopt parent metadata.
-        guard let objectURL = try BuildObjectDiscovery.configuration(in: project) else { return }
+        // package.frame projects keep no compiled state; their versions come from git tags.
+        guard let objectURL = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
+              try BuildObjectDiscovery.local(named: BuildObjectDiscovery.preferredConfiguration, in: project) == nil
+        else { return }
         let configuration = try BuildObjectConfiguration(from: objectURL)
         let release = configuration.versions.release
         let compiledURL = BuildObjectDiscovery.compiledURL(for: objectURL)

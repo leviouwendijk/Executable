@@ -26,14 +26,14 @@ public enum WorkflowPlanning {
     public enum Operation: Sendable, Equatable {
         case update(Condition)
         case build(Build.Config.Mode)
-        case test([String])
+        case test([Tests.Run])
         case publish(Publication)
 
         public var description: String {
             switch self {
             case .update(let condition): return "update [when: \(condition.rawValue)]"
             case .build(let config): return "build [\(config == .debug ? "debug" : "release")]"
-            case .test(let products): return "test: " + products.joined(separator: ", ")
+            case .test(let runs): return "test: " + runs.flatMap(\.products).joined(separator: ", ")
             case .publish(let policy):
                 return "publish [when: \(policy.guardCondition.rawValue), commit: \(policy.commit), push: \(policy.push), message: \(policy.message)]"
             }
@@ -146,7 +146,7 @@ public enum WorkflowPlanning {
             if let test = stage.test {
                 guard !test.isEmpty else { throw WorkflowConfigurationError.invalidPolicy("empty test for \(stage.id)") }
                 let resolved = try await Tests.resolve(at: directory, selection: .product(test))
-                operations.append(.test(resolved.products))
+                operations.append(.test(resolved.runs))
             }
             if stage.publish != nil || defaults?.publish != nil {
                 let when = try condition(stage.publish?.when ?? defaults?.publish?.when ?? "verified", allowed: [.always, .never, .verified])

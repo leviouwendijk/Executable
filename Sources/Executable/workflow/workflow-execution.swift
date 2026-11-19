@@ -167,8 +167,10 @@ public enum WorkflowExecution {
                             case .build(let configuration):
                                 try await performer.build(at: stage.directory, configuration: configuration)
                                 verified = true
-                            case .test(let products):
-                                try await performer.test(products: products, at: stage.directory)
+                            case .test(let runs):
+                                for run in runs {
+                                    try await performer.test(products: run.products, at: run.package)
+                                }
                                 verified = true
                             case .publish(let policy):
                                 if policy.guardCondition == .never || (!policy.commit && !policy.push) {

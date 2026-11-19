@@ -44,6 +44,86 @@ struct SwiftPackageFixture {
     }
 }
 
+extension SwiftPackageFixture {
+    /// A nested `Tests/` package with one product, `t_fixture`, depending on the fixture by path,
+    /// described by `tests` (package.frame source). With `throughSibling`, a second package also
+    /// depends on the fixture, as a test library whose graph contains the package under test would.
+    func writeTestPackage(
+        tests: String = "import Executable;\n\nlet tests: Tests = .{};\n",
+        throughSibling: Bool = false
+    ) throws {
+        let parent = root.lastPathComponent
+        let middleDependency = throughSibling ? #", .package(path: "Middle")"# : ""
+        let middleProduct = throughSibling ? #", .product(name: "Middle", package: "Middle")"# : ""
+
+        try write(
+            """
+            // swift-tools-version: 6.2
+
+            import PackageDescription
+
+            let package = Package(
+                name: "ExecutableFixtureTests",
+                products: [
+                    .executable(name: "t_fixture", targets: ["FixtureTests"]),
+                ],
+                dependencies: [.package(path: "..")\(middleDependency)],
+                targets: [
+                    .executableTarget(
+                        name: "FixtureTests",
+                        dependencies: [.product(name: "FixtureCore", package: "\(parent)")\(middleProduct)]
+                    ),
+                ]
+            )
+            """,
+            to: "Tests/Package.swift"
+        )
+
+        try write(
+            """
+            import FixtureCore
+
+            print("tests-\\(fixtureValue())")
+            """,
+            to: "Tests/Sources/FixtureTests/main.swift"
+        )
+
+        try write(tests, to: "Tests/package.frame")
+
+        guard throughSibling else { return }
+
+        try write(
+            """
+            // swift-tools-version: 6.2
+
+            import PackageDescription
+
+            let package = Package(
+                name: "Middle",
+                products: [.library(name: "Middle", targets: ["Middle"])],
+                dependencies: [.package(path: "../..")],
+                targets: [
+                    .target(
+                        name: "Middle",
+                        dependencies: [.product(name: "FixtureCore", package: "\(parent)")]
+                    ),
+                ]
+            )
+            """,
+            to: "Tests/Middle/Package.swift"
+        )
+
+        try write(
+            """
+            import FixtureCore
+
+            public func middleValue() -> String { fixtureValue() }
+            """,
+            to: "Tests/Middle/Sources/Middle/middle.swift"
+        )
+    }
+}
+
 private extension SwiftPackageFixture {
     func writePackage() throws {
         try write(

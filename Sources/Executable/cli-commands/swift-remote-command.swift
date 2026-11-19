@@ -61,7 +61,7 @@ public enum SwiftRemoteSetCommand: BoundArgumentCommand {
             options.project
         )
 
-        let objectURL = try BuildObjectDiscovery.requireConfiguration(in: directory)
+        let objectURL = try BuildObjectDiscovery.requireLocal(named: BuildObjectDiscovery.legacyConfiguration, in: directory)
 
         var configuration = try BuildObjectConfiguration(
             from: objectURL

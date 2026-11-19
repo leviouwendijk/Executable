@@ -3,7 +3,7 @@ import Version
 
 extension CompiledLocalBuildObject {
     public static func new(to url: URL) throws {
-        let new = url.pathExtension == "frame" ? try nil_init().frameString() : empty()
+        let new = empty()
         do {
             try BuildObjectFile.write(new, to: url)
         } catch {

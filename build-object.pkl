@@ -12,15 +12,6 @@ compile {
     use = false
     arguments { }
 }
-tests {
-    primary = "t_executable"
-
-    groups {
-        quick { "t_executable" }
-        integration { "etest" }
-        all { "t_executable" "etest" }
-    }
-}
 details = ""
 author = "levi"
 update = "https://raw.githubusercontent.com/leviouwendijk/Executable/master/build-object.pkl"

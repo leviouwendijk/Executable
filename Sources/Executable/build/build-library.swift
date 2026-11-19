@@ -133,7 +133,7 @@ public enum BuildLibrary {
         )
     }
 
-    package static func packageInfo(
+    @_spi(Testing) public static func packageInfo(
         _ dir: URL
     ) async throws -> String {
         let manifest = try await Package.manifest(
@@ -145,20 +145,20 @@ public enum BuildLibrary {
         )
     }
 
-    package static func packageInfo(
+    @_spi(Testing) public static func packageInfo(
         _ manifest: SwiftPackageManifest
     ) -> String {
         manifest.name
     }
 
-    package struct LibraryProduct:
+    @_spi(Testing) public struct LibraryProduct:
         Sendable,
         Equatable
     {
-        package let name: String
-        package let targets: [String]
+        public let name: String
+        public let targets: [String]
 
-        package init(
+        public init(
             name: String,
             targets: [String]
         ) {
@@ -167,7 +167,7 @@ public enum BuildLibrary {
         }
     }
 
-    package static func libraryProducts(
+    @_spi(Testing) public static func libraryProducts(
         _ dir: URL
     ) async throws -> [LibraryProduct] {
         let manifest = try await Package.manifest(
@@ -179,7 +179,7 @@ public enum BuildLibrary {
         )
     }
 
-    package static func libraryProducts(
+    @_spi(Testing) public static func libraryProducts(
         _ manifest: SwiftPackageManifest
     ) -> [LibraryProduct] {
         manifest.products
@@ -260,7 +260,7 @@ public enum BuildLibrary {
         }
     }
 
-    package static func buildArguments(
+    @_spi(Testing) public static func buildArguments(
         targetName: String,
         config: Build.Config
     ) -> [String] {
@@ -280,7 +280,7 @@ public enum BuildLibrary {
     }
 
     @discardableResult
-    package static func runSwift(
+    @_spi(Testing) public static func runSwift(
         _ command: [String],
         in dir: URL
     ) async throws -> Build.BuildResult {

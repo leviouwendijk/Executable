@@ -3,21 +3,7 @@ import Version
 
 extension BuildObjectConfiguration {
     public static func new(to url: URL) throws {
-        let new: String
-        if url.pathExtension == "frame" {
-            let defaults = nil_init()
-            new = try BuildObjectConfiguration(
-                name: url.deletingLastPathComponent().lastPathComponent,
-                types: [.binary],
-                versions: defaults.versions,
-                compile: defaults.compile,
-                details: defaults.details,
-                author: defaults.author,
-                update: defaults.update
-            ).frameString()
-        } else {
-            new = empty()
-        }
+        let new = empty()
         do {
             try BuildObjectFile.write(new, to: url)
         } catch {

@@ -24,13 +24,13 @@ public enum SwiftVersionCommand: RunnableArgumentCommand {
             isDirectory: true
         )
 
-        let objectURL = try BuildObjectDiscovery.requireConfiguration(in: current)
+        let objectURL = try BuildObjectDiscovery.requireLocal(named: BuildObjectDiscovery.legacyConfiguration, in: current)
         let object = try BuildObjectConfiguration(
             from: objectURL
         )
 
         let compiledURL = try BuildObjectDiscovery.requireLocal(
-            named: BuildObjectDiscovery.compiledName(for: objectURL), in: current
+            named: BuildObjectDiscovery.legacyCompiled, in: current
         )
         let compiled = try CompiledLocalBuildObject(
             from: compiledURL

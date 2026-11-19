@@ -167,7 +167,12 @@ public struct ObjectRenewer: Sendable {
         //     throw ObjectRenewerError.compilableNotConfigured(object.path)
         // }
 
-        if compilable {
+        if compilable,
+           try BuildObjectDiscovery.configuration(in: resolvedPaths.directory)?.lastPathComponent == BuildObjectDiscovery.preferredConfiguration {
+            // Versions for package.frame projects come from git tags; until then, always rebuild.
+            printi("package.frame project; compiling…")
+            try await execute(in: resolvedPaths.directory)
+        } else if compilable {
             let obj_url = try BuildObjectDiscovery.requireConfiguration(in: resolvedPaths.directory)
             let obj = try BuildObjectConfiguration(from: obj_url)
 
@@ -195,7 +200,7 @@ public struct ObjectRenewer: Sendable {
                     printi("release:    \(v_release.string(prefixStyle: .none))", times: 2)
                 }
             } else {
-                printi("No \(BuildObjectDiscovery.compiledName(for: obj_url)) detected; compiling…")
+                printi("No \(BuildObjectDiscovery.legacyCompiled) detected; compiling…")
                 reasonToCompile = true
             }
 
@@ -289,7 +294,7 @@ public struct ObjectRenewer: Sendable {
     }
 
     @discardableResult
-    package static func executeCommand(
+    @_spi(Testing) public static func executeCommand(
         in dirURL: URL,
         launchPath: String,
         arguments: [String],
@@ -519,7 +524,7 @@ extension ObjectRenewer {
             seenDirs.insert(dirPath)
 
             // Both configuration formats identify compilable projects.
-            let compilable = ["build.frame", "build-object.pkl"].contains {
+            let compilable = [BuildObjectDiscovery.preferredConfiguration, BuildObjectDiscovery.legacyConfiguration].contains {
                 fm.fileExists(atPath: dir.appendingPathComponent($0).path)
             }
 
@@ -535,7 +540,7 @@ extension ObjectRenewer {
         }
 
         // Include the root when either configuration format exists.
-        if ["build.frame", "build-object.pkl"].contains(where: {
+        if [BuildObjectDiscovery.preferredConfiguration, BuildObjectDiscovery.legacyConfiguration].contains(where: {
             fm.fileExists(atPath: root.appendingPathComponent($0).path)
         }) {
             registerProject(at: root)
@@ -556,7 +561,7 @@ extension ObjectRenewer {
                 continue
             }
 
-            if url.lastPathComponent == "build.frame" || url.lastPathComponent == "build-object.pkl" {
+            if url.lastPathComponent == BuildObjectDiscovery.preferredConfiguration || url.lastPathComponent == BuildObjectDiscovery.legacyConfiguration {
                 let dir = url.deletingLastPathComponent()
                 registerProject(at: dir)
             }

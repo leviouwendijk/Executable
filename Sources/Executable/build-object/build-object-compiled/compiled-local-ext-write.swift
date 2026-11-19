@@ -17,6 +17,6 @@ extension CompiledLocalBuildObject {
     }
 
     public func write(to url: URL) throws {
-        try BuildObjectFile.write(url.pathExtension == "frame" ? try frameString() : string(), to: url)
+        try BuildObjectFile.write(string(), to: url)
     }
 }

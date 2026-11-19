@@ -50,9 +50,9 @@ public enum WorkflowPackagePlanning {
         }
         if verify {
             // A shipping action must have declared tests, never silently publish an untested package.
-            let products = try await Tests.resolve(at: directory, selection: .primary).products
+            let runs = try await Tests.resolve(at: directory, selection: .primary).runs
             operations.append(.build(configuration))
-            operations.append(.test(products))
+            operations.append(.test(runs))
         }
         if publish {
             operations.append(.publish(.init(

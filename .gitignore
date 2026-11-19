@@ -1,5 +1,5 @@
 .DS_Store
-/.build
+.build/
 /Packages
 xcuserdata/
 DerivedData/
@@ -11,3 +11,16 @@ DerivedData/
 compiled.pkl
 /compiled.pkl
 **/compiled.pkl
+
+# gm defaults
+.index-build/
+.swiftpm/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+.env
+.env.*
+.env/*
+.claude/
+**/.testflows/*
+!**/.testflows/snapshots/

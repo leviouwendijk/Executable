@@ -15,7 +15,7 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         @Opt("project", short: "p", help: "Project directory (defaults to CWD).")
         public var project: String?
 
-        @Flag("all", help: "Run all declared test products, without duplicates.")
+        @Flag("all", help: "Run every test product except the interactive ones.")
         public var all: Bool
 
         @Opt("group", help: "Run a named test group.")
@@ -29,7 +29,7 @@ public enum SwiftTestCommand: BoundArgumentCommand {
 
     public static func components() throws -> [CommandComponentLowerable] {
         [
-            about("Run executable test products declared in local build-object.pkl tests { }."),
+            about("Run the test products of the nested Tests/ package, as declared in package.frame .tests."),
             try params(Options.self),
         ]
     }
@@ -50,7 +50,9 @@ public enum SwiftTestCommand: BoundArgumentCommand {
             URL(fileURLWithPath: $0, isDirectory: true)
         } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         let plan = try await Tests.resolve(at: root, selection: selection)
-        print("Running \(plan.products.count) test product(s) in \(plan.project.path)")
+        for run in plan.runs {
+            print("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")
+        }
         try await Tests.execute(plan)
     }
 }

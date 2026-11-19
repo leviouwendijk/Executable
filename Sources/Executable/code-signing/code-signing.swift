@@ -236,7 +236,7 @@ public enum CodeSigning {
         )
     }
 
-    package static func parseIdentities(_ output: String) -> [Identity] {
+    @_spi(Testing) public static func parseIdentities(_ output: String) -> [Identity] {
         output.split(whereSeparator: \.isNewline).compactMap { rawLine in
             let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
             guard
