@@ -22,6 +22,7 @@ public enum SwiftBuildManagerCommand: ArgumentCommand {
         SwiftPackCommand.self,
         SwiftConfigCommand.self,
         SwiftIncrementCommand.self,
+        SwiftReleaseCommand.self,
         SwiftUpdateCommand.self,
         SwiftVersionCommand.self,
         SwiftFrameModuleCommand.self,

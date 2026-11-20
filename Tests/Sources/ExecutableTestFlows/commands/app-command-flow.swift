@@ -40,6 +40,7 @@ extension ExecutableFlowSuite {
                         "pack",
                         "config",
                         "increment",
+                        "release",
                         "update",
                         "version",
                         "frame-module",

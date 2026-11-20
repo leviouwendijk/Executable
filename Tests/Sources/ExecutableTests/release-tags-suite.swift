@@ -59,6 +59,23 @@ extension ExecutableTestSuite {
             }
         }
 
+        Test("create tags an exact version, never one at or below the latest release") {
+            let fixture = try await TagFixture()
+            defer { fixture.remove() }
+            try await ReleaseTags.create(.init(major: 2, minor: 0, patch: 1), at: fixture.work)
+            try Expect.contains(try await fixture.remoteTags(), "2.0.1", "the exact version is tagged and pushed")
+
+            try await fixture.commit("next")
+            try await Expect.throwsError("an older version is refused") {
+                try await ReleaseTags.create(.init(major: 1, minor: 9, patch: 0), at: fixture.work)
+            }
+            try await Expect.throwsError("the same version is refused") {
+                try await ReleaseTags.create(.init(major: 2, minor: 0, patch: 1), at: fixture.work)
+            }
+            try await ReleaseTags.create(.init(major: 2, minor: 1, patch: 0), at: fixture.work)
+            try Expect.equal(try await ReleaseTags.latest(at: fixture.work), .init(major: 2, minor: 1, patch: 0), "a newer version is tagged")
+        }
+
         Test("deployed products are behind until a deploy records the released version") {
             let fixture = try await TagFixture()
             defer { fixture.remove() }

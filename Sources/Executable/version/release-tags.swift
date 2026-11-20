@@ -10,6 +10,7 @@ public enum ReleaseTags {
         case unpushed(URL, ahead: Int)
         case exists(String)
         case alreadyReleased(String)
+        case notNewer(String, latest: String)
 
         public var errorDescription: String? {
             switch self {
@@ -19,6 +20,8 @@ public enum ReleaseTags {
                 return "\(directory.path) is \(ahead) commit(s) ahead of its upstream; push before tagging a release."
             case .exists(let tag):
                 return "Tag \(tag) already exists (as \(tag) or v\(tag))."
+            case .notNewer(let tag, let latest):
+                return "\(tag) is not newer than the latest release \(latest)."
             case .alreadyReleased(let tag):
                 return "HEAD is already released as \(tag); commit something new before the next release."
             }
@@ -63,7 +66,8 @@ public enum ReleaseTags {
     }
 
     /// Tags HEAD with `version` and pushes the tag to the upstream remote. Refuses a dirty or
-    /// unpushed HEAD, a HEAD that is already released, and a version tagged before.
+    /// unpushed HEAD, a HEAD that is already released, a version tagged before, and a version
+    /// not newer than the latest release.
     public static func create(
         _ version: ObjectVersion,
         at directory: URL,
@@ -78,6 +82,9 @@ public enum ReleaseTags {
         }
 
         let tag = name(for: version)
+        if let newest = try await latest(at: directory), version <= newest {
+            throw TagError.notNewer(tag, latest: name(for: newest))
+        }
         let existing = Set(try await tags(at: directory, ["tag", "--list"]))
         guard !existing.contains(tag), !existing.contains("v" + tag) else { throw TagError.exists(tag) }
 
