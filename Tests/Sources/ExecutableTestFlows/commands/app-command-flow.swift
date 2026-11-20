@@ -36,6 +36,8 @@ extension ExecutableFlowSuite {
                         "list",
                         "setup",
                         "clean",
+                        "wipe",
+                        "keep",
                         "pack",
                         "config",
                         "increment",

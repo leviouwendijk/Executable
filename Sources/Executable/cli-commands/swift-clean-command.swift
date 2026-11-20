@@ -1,5 +1,6 @@
 import Arguments
 import Foundation
+import IO
 
 public enum SwiftCleanCommand: BoundArgumentCommand {
     public static let name = "clean"
@@ -18,7 +19,7 @@ public enum SwiftCleanCommand: BoundArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "swift package clean"
+                "swift package clean (sbm wipe deletes .build and .index-build)"
             ),
             try params(
                 Options.self
@@ -30,15 +31,12 @@ public enum SwiftCleanCommand: BoundArgumentCommand {
         _ options: Options,
         invocation: ParsedInvocation
     ) async throws {
-        let directory = options.project.map {
+        let directory = try options.project.map {
             URL(
                 fileURLWithPath: $0,
                 isDirectory: true
             )
-        } ?? URL(
-            fileURLWithPath: FileManager.default.currentDirectoryPath,
-            isDirectory: true
-        )
+        } ?? FileSystem.cwd()
 
         try await Build.clean(
             at: directory

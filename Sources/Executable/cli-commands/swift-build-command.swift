@@ -145,10 +145,13 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         )
         public var build: Bool
 
+        @Group("tidy")
+        public var tidy: SwiftTidyOptions
+
         public init() {}
 
-        var followUp: SwiftBuildFollowUp {
-            .init(test: test, bench: bench)
+        var steps: SwiftBuildSteps {
+            SwiftBuildSteps(test: test, bench: bench).with(tidy)
         }
     }
 
@@ -209,7 +212,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             )
         }
 
-        try await options.followUp.before(
+        try await options.steps.before(
             at: buildRequest.project
         )
 
@@ -225,7 +228,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             plan
         )
 
-        try await options.followUp.after(
+        try await options.steps.after(
             at: buildRequest.project
         )
     }
@@ -331,7 +334,7 @@ extension SwiftBuildCommand {
     ) -> Bool {
         !invocation.values.isEmpty
             || !invocation.repeatedValues.isEmpty
-            || invocation.flags.keys.contains { !SwiftBuildFollowUp.flagNames.contains($0) }
+            || invocation.flags.keys.contains { !SwiftBuildSteps.flagNames.contains($0) }
             || !invocation.passthrough.isEmpty
     }
 

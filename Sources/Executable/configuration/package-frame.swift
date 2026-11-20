@@ -28,6 +28,7 @@ public enum ExecutableFrame {
         .decodable(PackageFrame.TestsFields.self, named: "Tests"),
         .decodable(PackageFrame.BenchmarksFields.self, named: "Benchmarks"),
         .decodable(SbmSettings.Fields.self, named: "Settings"),
+        .decodable(KeepList.Fields.self, named: "Keep"),
     ])
 
     public static let environment = Frame.Environment([module])

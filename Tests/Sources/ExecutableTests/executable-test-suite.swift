@@ -6,5 +6,6 @@ enum ExecutableTestSuite {
         discoverySuite
         remoteBuildObjectSuite
         releaseTagsSuite
+        wipeSuite
     }
 }

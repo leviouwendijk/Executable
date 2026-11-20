@@ -51,6 +51,9 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
         )
         public var bench: Bool
 
+        @Group("tidy")
+        public var tidy: SwiftTidyOptions
+
         public init() {}
     }
 
@@ -77,12 +80,12 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
             at: directory
         )
 
-        let followUp = SwiftBuildFollowUp(
+        let steps = SwiftBuildSteps(
             test: options.test,
             bench: options.bench
-        )
+        ).with(options.tidy)
 
-        try await followUp.before(
+        try await steps.before(
             at: directory
         )
 
@@ -104,7 +107,7 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
             )
         }
 
-        try await followUp.after(
+        try await steps.after(
             at: directory
         )
     }

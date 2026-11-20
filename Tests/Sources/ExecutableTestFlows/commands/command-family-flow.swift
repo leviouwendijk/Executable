@@ -116,6 +116,20 @@ extension ExecutableFlowSuite {
 
                 let short = try Arguments.parse(["-b"], spec: spec).options(SwiftBuildCommand.Options.self)
                 try Expect.false(short.bench, "-b never means bench; bench has no short form")
+
+                let tidy = try Arguments.parse(["-t", "--wipe", "--clean-before"], spec: spec)
+                let tidied = try tidy.options(SwiftBuildCommand.Options.self)
+                try Expect.true(tidied.tidy.wipe && tidied.tidy.cleanBefore && !tidied.tidy.clean, "tidy flags parse on build")
+                try Expect.false(SwiftBuildCommand.hasExplicitInput(tidy), "tidy flags keep the package.frame build")
+
+                let test = try Arguments.parse(["test", "--wipe-before", "--clean"], spec: spec)
+                let testOptions = try test.options(SwiftTestCommand.Options.self)
+                try Expect.true(testOptions.tidy.wipeBefore && testOptions.tidy.clean, "tidy flags parse on test")
+
+                let wipe = try Arguments.parse(["wipe", "--tree", "-n"], spec: spec)
+                try Expect.equal(wipe.commandPath.map(\.rawValue), ["sbm", "wipe", "package"], "wipe defaults to the package wipe")
+                let caches = try Arguments.parse(["wipe", "caches", "-y"], spec: spec)
+                try Expect.equal(caches.commandPath.map(\.rawValue), ["sbm", "wipe", "caches"])
             }
 
             Step("library command rejects contradictory modes") {

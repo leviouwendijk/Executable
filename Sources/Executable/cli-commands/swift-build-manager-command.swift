@@ -18,6 +18,8 @@ public enum SwiftBuildManagerCommand: ArgumentCommand {
         SwiftListCommand.self,
         SwiftSetupCommand.self,
         SwiftCleanCommand.self,
+        SwiftWipeCommand.self,
+        SwiftKeepCommand.self,
         SwiftPackCommand.self,
         SwiftConfigCommand.self,
         SwiftIncrementCommand.self,

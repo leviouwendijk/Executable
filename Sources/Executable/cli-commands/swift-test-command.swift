@@ -1,5 +1,6 @@
 import Arguments
 import Foundation
+import IO
 
 public enum SwiftTestCommand: BoundArgumentCommand {
     public static let name = "test"
@@ -23,6 +24,9 @@ public enum SwiftTestCommand: BoundArgumentCommand {
 
         @Opt("product", help: "Run one product.")
         public var product: String?
+
+        @Group("tidy")
+        public var tidy: SwiftTidyOptions
 
         public init() {}
     }
@@ -50,18 +54,30 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         else if let product = options.product { selection = .product(product) }
         else { selection = .primary }
 
-        let root = options.project.map {
+        let root = try options.project.map {
             URL(fileURLWithPath: $0, isDirectory: true)
-        } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-        try await run(at: root, selection: selection, kind: kind)
+        } ?? FileSystem.cwd()
+        try await run(at: root, selection: selection, kind: kind, steps: SwiftBuildSteps().with(options.tidy))
     }
 
-    static func run(at root: URL, selection: TestConfiguration.Selection, kind: Tests.Kind) async throws {
+    /// Runs the plan, tidying the packages it runs in before and after (`--wipe`, `--clean`, …).
+    static func run(
+        at root: URL,
+        selection: TestConfiguration.Selection,
+        kind: Tests.Kind,
+        steps: SwiftBuildSteps = .init()
+    ) async throws {
         let plan = try await Tests.resolve(at: root, selection: selection, kind: kind)
+        var packages: [URL] = []
+        for run in plan.runs where !packages.contains(run.package) {
+            packages.append(run.package)
+        }
+        try await SwiftBuildSteps.tidy(packages, clean: steps.cleanBefore, wipe: steps.wipeBefore)
         for run in plan.runs {
             print("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")
         }
         try await Tests.execute(plan)
+        try await SwiftBuildSteps.tidy(packages, clean: steps.clean, wipe: steps.wipe)
     }
 }
 
