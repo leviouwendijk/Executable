@@ -7,10 +7,6 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
-# auto-added ignorables:
-compiled.pkl
-/compiled.pkl
-**/compiled.pkl
 
 # gm defaults
 .index-build/
