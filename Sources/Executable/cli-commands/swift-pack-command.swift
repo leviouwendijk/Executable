@@ -37,13 +37,26 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
         )
         public var build: Bool
 
+        @Flag(
+            "test",
+            short: "t",
+            help: "After updating, run the Tests/ package's primary products; with --build, a failure stops the build and deploy."
+        )
+        public var test: Bool
+
+        @Flag(
+            "bench",
+            help: "Run the Benchmarks/ package's primary products last (release)."
+        )
+        public var bench: Bool
+
         public init() {}
     }
 
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Run `swift package update` (default subcommand)."
+                "Run `swift package update` (default subcommand); then -t tests, -b builds, --bench benchmarks, in that order."
             ),
             try params(
                 Options.self
@@ -63,24 +76,35 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
             at: directory
         )
 
-        guard options.build else {
-            return
+        let followUp = SwiftBuildFollowUp(
+            test: options.test,
+            bench: options.bench
+        )
+
+        try await followUp.before(
+            at: directory
+        )
+
+        if options.build {
+            let request = try SwiftBuildCommand.projectDefaultRequest(
+                from: directory
+            )
+
+            let plan = try await Build.resolve(
+                request
+            )
+
+            SwiftBuildCommand.present(
+                plan
+            )
+
+            _ = try await Build.execute(
+                plan
+            )
         }
 
-        let request = try SwiftBuildCommand.projectDefaultRequest(
-            from: directory
-        )
-
-        let plan = try await Build.resolve(
-            request
-        )
-
-        SwiftBuildCommand.present(
-            plan
-        )
-
-        _ = try await Build.execute(
-            plan
+        try await followUp.after(
+            at: directory
         )
     }
 }

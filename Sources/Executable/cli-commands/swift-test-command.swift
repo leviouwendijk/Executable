@@ -53,6 +53,10 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         let root = options.project.map {
             URL(fileURLWithPath: $0, isDirectory: true)
         } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        try await run(at: root, selection: selection, kind: kind)
+    }
+
+    static func run(at root: URL, selection: TestConfiguration.Selection, kind: Tests.Kind) async throws {
         let plan = try await Tests.resolve(at: root, selection: selection, kind: kind)
         for run in plan.runs {
             print("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")

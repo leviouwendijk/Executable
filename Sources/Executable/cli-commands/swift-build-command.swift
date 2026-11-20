@@ -124,7 +124,25 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         )
         public var signingHardenedRuntime: Bool
 
+        @Flag(
+            "test",
+            short: "t",
+            help: "Run the Tests/ package's primary products first; a failure stops the build and deploy."
+        )
+        public var test: Bool
+
+        @Flag(
+            "bench",
+            short: "b",
+            help: "Run the Benchmarks/ package's primary products after the build (release)."
+        )
+        public var bench: Bool
+
         public init() {}
+
+        var followUp: SwiftBuildFollowUp {
+            .init(test: test, bench: bench)
+        }
     }
 
     public static func components() throws -> [CommandComponentLowerable] {
@@ -184,6 +202,10 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             )
         }
 
+        try await options.followUp.before(
+            at: buildRequest.project
+        )
+
         let plan = try await Build.resolve(
             buildRequest
         )
@@ -194,6 +216,10 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
         _ = try await Build.execute(
             plan
+        )
+
+        try await options.followUp.after(
+            at: buildRequest.project
         )
     }
 
@@ -291,6 +317,17 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 }
 
 extension SwiftBuildCommand {
+    /// Whether the invocation overrides package.frame. `-t`/`-b` only add tests and benchmarks
+    /// around the build, so `sbm -t` still builds (and deploys) the way package.frame says.
+    @_spi(Testing) public static func hasExplicitInput(
+        _ invocation: ParsedInvocation
+    ) -> Bool {
+        !invocation.values.isEmpty
+            || !invocation.repeatedValues.isEmpty
+            || invocation.flags.keys.contains { !SwiftBuildFollowUp.flagNames.contains($0) }
+            || !invocation.passthrough.isEmpty
+    }
+
     package static func present(
         _ plan: Build.Plan
     ) {
@@ -463,15 +500,6 @@ private extension SwiftBuildCommand {
             signing: signing,
             source: source
         )
-    }
-
-    static func hasExplicitInput(
-        _ invocation: ParsedInvocation
-    ) -> Bool {
-        !invocation.values.isEmpty
-            || !invocation.repeatedValues.isEmpty
-            || !invocation.flags.isEmpty
-            || !invocation.passthrough.isEmpty
     }
 
     static func csvValues(
