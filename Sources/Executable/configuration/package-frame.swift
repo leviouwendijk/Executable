@@ -19,8 +19,9 @@ import Frame
 ///
 ///     let tests: Tests = .{
 ///         .primary = "t_unifi",
-///         .groups = .{ .live = ["t_unifi_live"] },
+///         .groups = .{ .client = ["t_unifi_client"] },
 ///         .interactive = ["t_unifi_shell"],
+///         .live = ["t_unifi_live"],
 ///     };
 public enum ExecutableFrame {
     public static let module = Frame.Module("Executable", types: [
@@ -141,6 +142,7 @@ public enum PackageFrame {
             primary: tests.primary,
             groups: tests.groups.isEmpty ? nil : tests.groups,
             interactive: tests.interactive.isEmpty ? nil : tests.interactive,
+            live: tests.live.isEmpty ? nil : tests.live,
             mode: tests.mode,
             wipe: tests.wipe.map { .init(above: $0.above) }
         ))
@@ -172,7 +174,7 @@ public enum PackageFrame {
     }
 
     private static func configuration(_ fields: TestsFields) -> TestConfiguration {
-        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode,
+        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], live: fields.live ?? [], mode: fields.mode,
               wipe: fields.wipe.map { .init(above: $0.above) })
     }
 
@@ -225,14 +227,16 @@ extension PackageFrame {
         let primary: String?
         let groups: [String: [String]]?
         let interactive: [String]?
+        let live: [String]?
         let mode: BuildMode?
         let wipe: WipeFields?
 
         static var frameSchema: Frame.Schema {
             .object([
                 .init("primary", .string, summary: "The product `sbm test` runs by default; optional when the package has one product."),
-                .init("groups", .init(.any, summary: "Named lists of test products: .{ .live = [\"t_name_live\"] }.")),
+                .init("groups", .init(.any, summary: "Named lists of test products: .{ .flows = [\"t_name_flows\"] }.")),
                 .init("interactive", .array(.string), summary: "Products that wait for input; `sbm test --all` skips them."),
+                .init("live", .array(.string), summary: "Products that reach real services (network, credentials); `sbm test --live` runs them, `--all` skips them."),
                 .init("mode", .of(BuildMode.self), summary: "How the products build and run: .debug (default) or .release."),
                 .init("wipe", .of(WipeFields.self)),
             ], summary: "The test products of the test package beside this file: the `tests` binding of package.frame.")

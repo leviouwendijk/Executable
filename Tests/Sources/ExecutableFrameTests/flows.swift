@@ -25,8 +25,9 @@ enum ExecutableFrameTests {
 
         let tests: Tests = .{
             .primary = "t_unifi",
-            .groups = .{ .live = ["t_unifi_live"] },
+            .groups = .{ .client = ["t_unifi_client"] },
             .interactive = ["t_unifi_shell"],
+            .live = ["t_unifi_live"],
         };
         """
 
@@ -53,13 +54,14 @@ enum ExecutableFrameTests {
             try Expect.equal(local.flaglessArguments, ["--skip-products", "x", "--no-move"], "no .deploy keeps the build local")
         }
 
-        Test("a test package declares its primary, groups and interactive products") {
+        Test("a test package declares its primary, groups, interactive and live products") {
             guard case .tests(let configuration) = try PackageFrame.parse(tests) else {
                 throw ExpectationError("tests declares a test package")
             }
             try Expect.equal(configuration.primary, "t_unifi", "primary")
-            try Expect.equal(configuration.groups["live"], ["t_unifi_live"], "groups")
+            try Expect.equal(configuration.groups["client"], ["t_unifi_client"], "groups")
             try Expect.equal(configuration.interactive, ["t_unifi_shell"], "interactive products")
+            try Expect.equal(configuration.live, ["t_unifi_live"], "live products")
             guard case .tests(let empty) = try PackageFrame.parse("import Executable;\n\nlet tests: Tests = .{};\n") else {
                 throw ExpectationError("an empty test package is a test package")
             }
@@ -218,7 +220,7 @@ enum ExecutableFrameTests {
                 ("library", library),
                 ("tests", tests),
                 ("written package", try PackageFrame.source(PackageConfiguration(buildArguments: ["-d"], deployProducts: ["gm"]))),
-                ("written tests", try PackageFrame.source(TestConfiguration(primary: "t_a", interactive: ["t_b"]))),
+                ("written tests", try PackageFrame.source(TestConfiguration(primary: "t_a", interactive: ["t_b"], live: ["t_c"]))),
             ] {
                 try Expect.equal(
                     Frame.problems(in: try Frame.parse(source), environment: loaded.environment).map(\.message), [],

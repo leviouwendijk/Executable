@@ -8,7 +8,7 @@ public enum SwiftTestCommand: BoundArgumentCommand {
     public enum SelectionError: Error, LocalizedError {
         case conflictingOptions
         public var errorDescription: String? {
-            "Choose only one of --all, --group and --product."
+            "Choose only one of --all, --live, --group and --product."
         }
     }
 
@@ -16,8 +16,11 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         @Opt("project", short: "p", help: "Project directory (defaults to CWD).")
         public var project: String?
 
-        @Flag("all", help: "Run every product except the interactive ones.")
+        @Flag("all", help: "Run every product except the interactive and live ones.")
         public var all: Bool
+
+        @Flag("live", help: "Run the live products (real services, network, credentials).")
+        public var live: Bool
 
         @Opt("group", help: "Run a named group.")
         public var group: String?
@@ -46,10 +49,11 @@ public enum SwiftTestCommand: BoundArgumentCommand {
     }
 
     static func run(_ options: Options, kind: Tests.Kind) async throws {
-        let choices = [options.all, options.group != nil, options.product != nil].filter { $0 }.count
+        let choices = [options.all, options.live, options.group != nil, options.product != nil].filter { $0 }.count
         guard choices <= 1 else { throw SelectionError.conflictingOptions }
         let selection: TestConfiguration.Selection
         if options.all { selection = .all }
+        else if options.live { selection = .live }
         else if let group = options.group { selection = .group(group) }
         else if let product = options.product { selection = .product(product) }
         else { selection = .primary }

@@ -69,6 +69,30 @@ extension ExecutableFlowSuite {
                 }
             }
 
+            Step("live products run only under live, never in all or as the implicit primary") {
+                let config = TestConfiguration(interactive: ["t_shell"], live: ["t_live"])
+                let available: Set<String> = ["t_main", "t_live", "t_shell"]
+                try Expect.equal(
+                    try config.selectedProducts(for: .all, availableProducts: available, testPackage: true),
+                    ["t_main"], "all skips live and interactive products"
+                )
+                try Expect.equal(
+                    try config.selectedProducts(for: .live, availableProducts: available, testPackage: true),
+                    ["t_live"], "live runs the live products"
+                )
+                try Expect.equal(
+                    try config.selectedProducts(for: .primary, availableProducts: available, testPackage: true),
+                    ["t_main"], "the only product that is neither live nor interactive is the primary"
+                )
+                try Expect.throwsError("a live primary is refused") {
+                    _ = try TestConfiguration(primary: "t_live", live: ["t_live"])
+                        .selectedProducts(for: .primary, availableProducts: ["t_live"], testPackage: true)
+                }
+                try Expect.throwsError("live without live products is refused") {
+                    _ = try TestConfiguration().selectedProducts(for: .live, availableProducts: ["t_main"], testPackage: true)
+                }
+            }
+
             Step("tests declared only in a legacy build-object.pkl point at sbm modernize") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }

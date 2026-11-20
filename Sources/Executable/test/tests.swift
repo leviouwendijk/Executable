@@ -197,6 +197,9 @@ private extension Tests {
         case .group(let name):
             chosen = packages.filter { $0.configuration.groups[name] != nil }
             guard !chosen.isEmpty else { throw TestConfiguration.ValidationError.unknownGroup(name) }
+        case .live:
+            chosen = packages.filter { !$0.configuration.live.isEmpty }
+            guard !chosen.isEmpty else { throw TestConfiguration.ValidationError.noLiveProducts }
         }
 
         var runs: [Run] = []

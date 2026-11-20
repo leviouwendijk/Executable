@@ -7,6 +7,8 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     public let groups: [String: [String]]
     /// Products that wait for input; never run by `.all`.
     public let interactive: [String]
+    /// Products that reach real services (network, credentials); run by `.live`, never by `.all`.
+    public let live: [String]
     /// Overrides the kind's default (tests debug, benchmarks release).
     public let mode: BuildMode?
     /// Wipe the caches after a run when they exceed a size.
@@ -16,12 +18,14 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
         primary: String? = nil,
         groups: [String: [String]] = [:],
         interactive: [String] = [],
+        live: [String] = [],
         mode: BuildMode? = nil,
         wipe: WipePolicy? = nil
     ) {
         self.primary = primary
         self.groups = groups
         self.interactive = interactive
+        self.live = live
         self.mode = mode
         self.wipe = wipe
     }
@@ -29,6 +33,7 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     public enum Selection: Sendable, Equatable {
         case primary
         case all
+        case live
         case group(String)
         case product(String)
     }
@@ -36,6 +41,8 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     public enum ValidationError: Error, Sendable, Equatable, LocalizedError {
         case invalidPrimary
         case interactivePrimary(String)
+        case livePrimary(String)
+        case noLiveProducts
         case noPrimary([String])
         case invalidGroup(String)
         case emptyGroup(String)
@@ -47,6 +54,8 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
             switch self {
             case .invalidPrimary: return "tests.primary must be a non-empty executable product name."
             case .interactivePrimary(let name): return "Test product '\(name)' is interactive, so it cannot be the primary."
+            case .livePrimary(let name): return "Test product '\(name)' is live, so it cannot be the primary."
+            case .noLiveProducts: return "No live test products: declare .live."
             case .noPrimary(let candidates):
                 return candidates.isEmpty
                     ? "No primary test product: declare .primary."
@@ -67,6 +76,7 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
                 throw ValidationError.invalidPrimary
             }
             guard !interactive.contains(primary) else { throw ValidationError.interactivePrimary(primary) }
+            guard !live.contains(primary) else { throw ValidationError.livePrimary(primary) }
         }
         for (name, products) in groups {
             let scalar = Array(name.unicodeScalars)
@@ -92,12 +102,15 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
         switch selection {
         case .primary:
             if let primary { return [primary] }
-            let candidates = testPackage ? availableProducts.subtracting(interactive).sorted() : []
+            let candidates = testPackage ? availableProducts.subtracting(interactive).subtracting(live).sorted() : []
             guard candidates.count == 1 else { throw ValidationError.noPrimary(candidates) }
             return candidates
         case .all:
             let pool = testPackage ? Self.unique(declaredProducts() + availableProducts.sorted()) : declaredProducts()
-            return pool.filter { !interactive.contains($0) }
+            return pool.filter { !interactive.contains($0) && !live.contains($0) }
+        case .live:
+            guard !live.isEmpty else { throw ValidationError.noLiveProducts }
+            return Self.unique(live)
         case .group(let name):
             guard let products = groups[name] else { throw ValidationError.unknownGroup(name) }
             return Self.unique(products)
@@ -110,7 +123,7 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     }
 
     private func declaredProducts() -> [String] {
-        Self.unique((primary.map { [$0] } ?? []) + groups.keys.sorted().flatMap { groups[$0] ?? [] } + interactive)
+        Self.unique((primary.map { [$0] } ?? []) + groups.keys.sorted().flatMap { groups[$0] ?? [] } + interactive + live)
     }
 
     private static func unique(_ values: [String]) -> [String] {
