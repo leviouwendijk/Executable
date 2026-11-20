@@ -6,30 +6,72 @@ import Terminal
 
 public enum SwiftWipeCommand: ArgumentCommand {
     public static let name = "wipe"
-    public static let defaultChild = SwiftWipePackageCommand.self
+    public static let defaultChild = SwiftWipeAllCommand.self
 
     public static let children: [ArgumentCommandType] = [
-        SwiftWipePackageCommand.self,
+        SwiftWipeAllCommand.self,
+        SwiftWipeMainCommand.self,
+        SwiftWipeExtraCommand.self,
         SwiftWipeCachesCommand.self,
     ]
 
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Delete build caches: .build and .index-build here (--tree: every package below), or SwiftPM's global cache (caches)."
+                "Delete .build and .index-build: all (default), main (the package only), extra (Tests/ and Benchmarks/ only); -r for every package below. caches: SwiftPM's global cache."
             ),
         ]
     }
 }
 
-/// `sbm wipe [--tree [root]]`: .build and .index-build, honouring the keep list (`sbm keep`).
-public enum SwiftWipePackageCommand: BoundArgumentCommand {
-    public static let name = "package"
+/// `sbm wipe [all]`: the package with its Tests/ and Benchmarks/.
+public enum SwiftWipeAllCommand: BoundArgumentCommand {
+    public static let name = "all"
 
+    public static func components() throws -> [CommandComponentLowerable] {
+        [about("Delete .build and .index-build of the package and its Tests/ and Benchmarks/ (-r: every package below)."),
+         try params(SwiftWipePackageCommand.Options.self)]
+    }
+
+    public static func run(_ options: SwiftWipePackageCommand.Options, invocation: ParsedInvocation) async throws {
+        try await SwiftWipePackageCommand.run(options, scope: .all)
+    }
+}
+
+/// `sbm wipe main`: the package itself, leaving Tests/ and Benchmarks/.
+public enum SwiftWipeMainCommand: BoundArgumentCommand {
+    public static let name = "main"
+
+    public static func components() throws -> [CommandComponentLowerable] {
+        [about("Delete .build and .index-build of the package itself, not its Tests/ and Benchmarks/ (-r: every main package below)."),
+         try params(SwiftWipePackageCommand.Options.self)]
+    }
+
+    public static func run(_ options: SwiftWipePackageCommand.Options, invocation: ParsedInvocation) async throws {
+        try await SwiftWipePackageCommand.run(options, scope: .main)
+    }
+}
+
+/// `sbm wipe extra`: only Tests/ and Benchmarks/ packages, each confirmed by its package.frame.
+public enum SwiftWipeExtraCommand: BoundArgumentCommand {
+    public static let name = "extra"
+
+    public static func components() throws -> [CommandComponentLowerable] {
+        [about("Delete .build and .index-build of Tests/ and Benchmarks/ only (their package.frame must say tests/benchmarks); the main build stays (-r: every one below)."),
+         try params(SwiftWipePackageCommand.Options.self)]
+    }
+
+    public static func run(_ options: SwiftWipePackageCommand.Options, invocation: ParsedInvocation) async throws {
+        try await SwiftWipePackageCommand.run(options, scope: .extra)
+    }
+}
+
+/// The options and execution `all`, `main` and `extra` share.
+public enum SwiftWipePackageCommand {
     public struct Options: ArgumentGroup {
         @Arg(
             "root",
-            help: "With --tree: the directory to search (defaults to the project directory).",
+            help: "With -r: the directory to search (defaults to the project directory).",
             default: ""
         )
         public var root: String
@@ -42,15 +84,16 @@ public enum SwiftWipePackageCommand: BoundArgumentCommand {
         public var project: String?
 
         @Flag(
-            "tree",
-            help: "Every package below the root, nested Tests/ and Benchmarks/ included."
+            "recursive",
+            short: "r",
+            help: "Every package below the root, at any depth (limit with -d)."
         )
-        public var tree: Bool
+        public var recursive: Bool
 
         @Opt(
             "depth",
             short: "d",
-            help: "With --tree: how deep to search (root = 0)."
+            help: "With -r: how deep to search (root = 0)."
         )
         public var depth: Int?
 
@@ -77,23 +120,9 @@ public enum SwiftWipePackageCommand: BoundArgumentCommand {
         public init() {}
     }
 
-    public static func components() throws -> [CommandComponentLowerable] {
-        [
-            about(
-                "Delete .build and .index-build of this package and its Tests/ and Benchmarks/ (--tree: every package below)."
-            ),
-            try params(
-                Options.self
-            ),
-        ]
-    }
-
-    public static func run(
-        _ options: Options,
-        invocation: ParsedInvocation
-    ) async throws {
-        guard options.tree || (options.root.isEmpty && options.depth == nil) else {
-            throw ArgumentValidationError("A root and --depth apply only with --tree.")
+    static func run(_ options: Options, scope: Wipe.Scope) async throws {
+        guard options.recursive || (options.root.isEmpty && options.depth == nil) else {
+            throw ArgumentValidationError("A root and --depth apply only with -r.")
         }
         let project = try options.project.map {
             URL(fileURLWithPath: $0, isDirectory: true)
@@ -101,7 +130,8 @@ public enum SwiftWipePackageCommand: BoundArgumentCommand {
         let root = options.root.isEmpty ? project : URL(fileURLWithPath: options.root, isDirectory: true)
 
         let plan = try Wipe.plan(
-            .init(root: root, tree: options.tree, depth: options.depth, ignoreKeep: options.ignoreKeep, measure: !options.yes),
+            .init(root: root, scope: scope, recursive: options.recursive, depth: options.depth,
+                  ignoreKeep: options.ignoreKeep, measure: !options.yes),
             keep: options.ignoreKeep ? KeepList() : try KeepList.load()
         )
         try await execute(plan, dryRun: options.dryRun, interactive: !options.yes && !options.dryRun)

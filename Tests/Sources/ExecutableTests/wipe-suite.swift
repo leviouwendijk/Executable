@@ -114,7 +114,7 @@ extension ExecutableTestSuite {
             }
         }
 
-        Test("--tree finds packages by depth and prunes caches, .git and dot-directories") {
+        Test("-r finds packages by depth and skips caches, .git and dot-directories") {
             let fixture = try WipeFixture()
             defer { fixture.remove() }
             _ = try fixture.package("a", caches: [".build"])
@@ -123,12 +123,34 @@ extension ExecutableTestSuite {
             _ = try fixture.package("a/.build/checkouts/dep")
             _ = try fixture.package(".hidden/c")
 
-            let all = try Wipe.plan(.init(root: fixture.root, tree: true), keep: KeepList()) { _ in nil }
+            let all = try Wipe.plan(.init(root: fixture.root, recursive: true), keep: KeepList()) { _ in nil }
             try Expect.equal(all.packages.map { $0.path.replacingOccurrences(of: FileManager.default.resolvingPath(fixture.root) + "/", with: "") },
                              ["a", "a/Tests", "group/b"])
 
-            let shallow = try Wipe.plan(.init(root: fixture.root, tree: true, depth: 1), keep: KeepList()) { _ in nil }
+            let shallow = try Wipe.plan(.init(root: fixture.root, recursive: true, depth: 1), keep: KeepList()) { _ in nil }
             try Expect.equal(shallow.packages.map(\.lastPathComponent), ["a"])
+        }
+
+        Test("main and extra split a package; extra needs package.frame to confirm Tests/ and Benchmarks/") {
+            let fixture = try WipeFixture()
+            defer { fixture.remove() }
+            let package = try fixture.package("IO", caches: [".build"])
+            let tests = try fixture.package("IO/Tests", caches: [".build"])
+            let benchmarks = try fixture.package("IO/Benchmarks", caches: [".build"])
+            try "import Executable;\nlet tests: Tests = .{};\n".write(to: tests.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
+            try "import Executable;\nlet benchmarks: Benchmarks = .{};\n".write(to: benchmarks.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
+            _ = try fixture.package("other/Tests", caches: [".build"])
+
+            func names(_ scope: Wipe.Scope, recursive: Bool = false, root: URL? = nil) throws -> [String] {
+                try Wipe.plan(.init(root: root ?? package, scope: scope, recursive: recursive), keep: KeepList()) { _ in nil }
+                    .packages.map { $0.path.replacingOccurrences(of: FileManager.default.resolvingPath(fixture.root) + "/", with: "") }
+            }
+            try Expect.equal(try names(.all), ["IO", "IO/Tests", "IO/Benchmarks"])
+            try Expect.equal(try names(.main), ["IO"])
+            try Expect.equal(try names(.extra), ["IO/Tests", "IO/Benchmarks"])
+            try Expect.equal(try names(.extra, recursive: true, root: fixture.root), ["IO/Benchmarks", "IO/Tests"],
+                             "a Tests/ without package.frame saying tests is not wiped by extra")
+            try Expect.equal(try names(.main, recursive: true, root: fixture.root), ["IO", "other/Tests"])
         }
 
         Test("remove detaches then deletes; the cache name is free again") {

@@ -1,12 +1,20 @@
 import Foundation
 import IO
+import Path
 
-/// `sbm wipe`: delete `.build` and `.index-build` of one package (with its nested
-/// Tests/ and Benchmarks/ packages) or of every package under a root, honouring the keep list
-/// and never deleting under a running build. Planning is separate from removal, so a dry run is
-/// the same plan without executing it.
+/// `sbm wipe`: delete `.build` and `.index-build`, honouring the keep list and never deleting
+/// under a running build. The scope picks which packages: `all` (the package with its Tests/ and
+/// Benchmarks/), `main` (the package itself) or `extra` (only Tests/ and Benchmarks/, each
+/// confirmed by its package.frame). `recursive` applies the scope to every package below the
+/// root. Planning is separate from removal, so a dry run is the same plan without executing it.
 public enum Wipe {
     public typealias Cache = KeepEntry.Cache
+
+    public enum Scope: String, Sendable, CaseIterable {
+        case all
+        case main
+        case extra
+    }
 
     public enum Decision: Sendable, Equatable {
         case delete
@@ -36,22 +44,29 @@ public enum Wipe {
 
     public struct Options: Sendable {
         public var root: URL
-        public var tree: Bool
-        /// Depth below `root` searched with `tree` (root = 0); nil for no limit.
+        public var scope: Scope
+        public var recursive: Bool
+        /// Depth below `root` searched with `recursive` (root = 0); nil for no limit.
         public var depth: Int?
         public var ignoreKeep: Bool
         public var measure: Bool
 
-        public init(root: URL, tree: Bool = false, depth: Int? = nil, ignoreKeep: Bool = false, measure: Bool = false) {
+        public init(
+            root: URL,
+            scope: Scope = .all,
+            recursive: Bool = false,
+            depth: Int? = nil,
+            ignoreKeep: Bool = false,
+            measure: Bool = false
+        ) {
             self.root = root
-            self.tree = tree
+            self.scope = scope
+            self.recursive = recursive
             self.depth = depth
             self.ignoreKeep = ignoreKeep
             self.measure = measure
         }
     }
-
-    static let pruned: Set<String> = [".git", ".build", ".index-build", ".swiftpm", "node_modules"]
 
     public static func plan(
         _ options: Options,
@@ -59,9 +74,10 @@ public enum Wipe {
         running: (URL) -> SwiftPMBuildLock.Holder? = SwiftPMBuildLock.holder(of:)
     ) throws -> Plan {
         let root = FileSystem.default.resolve(options.root)
-        let packages = options.tree
+        let candidates = options.recursive
             ? try packages(under: root, depth: options.depth)
             : try packages(at: root)
+        let packages = candidates.filter { options.scope.includes($0) }
         return try plan(packages, root: root, keep: options.ignoreKeep ? KeepList() : keep,
                         measure: options.measure, running: running)
     }
@@ -115,31 +131,50 @@ public enum Wipe {
         guard FileSystem.default.exists(root.appendingPathComponent("Package.swift")) else {
             throw WipeError.not_a_package(root)
         }
-        let nested = ["Tests", "Benchmarks"]
-            .map { root.appendingPathComponent($0, isDirectory: true) }
+        let nested = Nested.allCases
+            .map { root.appendingPathComponent($0.directory, isDirectory: true) }
             .filter { FileSystem.default.exists($0.appendingPathComponent("Package.swift")) }
         return [root] + nested
     }
 
     /// Every directory holding a Package.swift at or below `root`, nested packages included.
-    /// Symbolic links are not followed; caches, `.git` and other dot-directories are pruned.
+    /// One PathWalker walk: symbolic links are not followed, and hidden directories (`.build`,
+    /// `.index-build`, `.git`, `.swiftpm`, leftovers) are skipped.
     static func packages(under root: URL, depth: Int?) throws -> [URL] {
-        var found: [URL] = []
-        var queue: [(URL, Int)] = [(root, 0)]
-        while !queue.isEmpty {
-            let (directory, level) = queue.removeFirst()
-            guard let entries = try? FileSystem.default.directory.entries(directory) else { continue }
-            if entries.contains(where: { $0.kind == .file && $0.url.lastPathComponent == "Package.swift" }) {
-                found.append(directory)
-            }
-            guard depth.map({ level < $0 }) ?? true else { continue }
-            for entry in entries where entry.kind == .directory {
-                let name = entry.url.lastPathComponent
-                guard !name.hasPrefix("."), !pruned.contains(name), !isLeftover(name) else { continue }
-                queue.append((entry.url, level + 1))
+        let walker = PathWalker(
+            root: root,
+            configuration: .init(maxDepth: depth, includeHidden: false, followSymlinks: false, emitDirectories: true, emitFiles: false)
+        )
+        let directories = [root] + (try walker.walk()).map(\.url)
+        return directories
+            .filter { FileSystem.default.exists($0.appendingPathComponent("Package.swift")) }
+            .map { FileSystem.default.resolve($0) }
+            .sorted { $0.path < $1.path }
+    }
+
+    /// The conventional nested packages, and the package.frame binding that confirms each.
+    enum Nested: CaseIterable {
+        case tests
+        case benchmarks
+
+        var directory: String {
+            switch self {
+            case .tests: return PackageLayout().tests.name
+            case .benchmarks: return PackageLayout().benchmarks.name
             }
         }
-        return found.sorted { $0.path < $1.path }
+
+        /// The nested package `package` is, by its directory name and its package.frame binding.
+        static func of(_ package: URL) -> Nested? {
+            guard let nested = allCases.first(where: { $0.directory == package.lastPathComponent }),
+                  let file = try? BuildObjectDiscovery.local(named: PackageFrame.fileName, in: package),
+                  let description = try? PackageFrame.read(file)
+            else { return nil }
+            switch (nested, description) {
+            case (.tests, .tests), (.benchmarks, .benchmarks): return nested
+            default: return nil
+            }
+        }
     }
 
     static func isLeftover(_ name: String) -> Bool {
@@ -184,7 +219,7 @@ public enum WipeError: Error, Sendable, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .not_a_package(let url):
-            return "No Package.swift in \(url.path); use --tree to clean every package below it."
+            return "No Package.swift in \(url.path); use -r to wipe every package below it."
         case .not_empty(let url, let remaining, let sample):
             return """
                 \(url.path) still has \(remaining) entries after 3 attempts; something keeps writing there.
@@ -206,5 +241,17 @@ extension Int64 {
             unit += 1
         }
         return unit == 0 ? "\(self)B" : String(format: value < 10 ? "%.1f" : "%.0f", value) + units[unit]
+    }
+}
+
+extension Wipe.Scope {
+    /// `extra` takes only Tests/ and Benchmarks/ packages their package.frame confirms; `main`
+    /// takes everything else.
+    func includes(_ package: URL) -> Bool {
+        switch self {
+        case .all: return true
+        case .main: return Wipe.Nested.of(package) == nil
+        case .extra: return Wipe.Nested.of(package) != nil
+        }
     }
 }

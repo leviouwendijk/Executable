@@ -126,8 +126,10 @@ extension ExecutableFlowSuite {
                 let testOptions = try test.options(SwiftTestCommand.Options.self)
                 try Expect.true(testOptions.tidy.wipeBefore && testOptions.tidy.clean, "tidy flags parse on test")
 
-                let wipe = try Arguments.parse(["wipe", "--tree", "-n"], spec: spec)
-                try Expect.equal(wipe.commandPath.map(\.rawValue), ["sbm", "wipe", "package"], "wipe defaults to the package wipe")
+                let wipe = try Arguments.parse(["wipe", "-r", "-n"], spec: spec)
+                try Expect.equal(wipe.commandPath.map(\.rawValue), ["sbm", "wipe", "all"], "wipe defaults to all")
+                let extra = try Arguments.parse(["wipe", "extra", "-r", "~/main"], spec: spec)
+                try Expect.equal(extra.commandPath.map(\.rawValue), ["sbm", "wipe", "extra"])
                 let caches = try Arguments.parse(["wipe", "caches", "-y"], spec: spec)
                 try Expect.equal(caches.commandPath.map(\.rawValue), ["sbm", "wipe", "caches"])
             }
