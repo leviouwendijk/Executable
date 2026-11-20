@@ -6,4 +6,5 @@ let tests: Tests = .{
         .frame = ["t_executable_frame"],
         .flows = ["t_executable_flows"],
     },
+    .wipe = .{ .above = .gigabytes(4) },
 };
