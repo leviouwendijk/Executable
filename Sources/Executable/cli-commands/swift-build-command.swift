@@ -133,10 +133,17 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
         @Flag(
             "bench",
-            short: "b",
+            alias: "benchmark",
             help: "Run the Benchmarks/ package's primary products after the build (release)."
         )
         public var bench: Bool
+
+        @Flag(
+            "build",
+            short: "b",
+            help: "Build (what this command does anyway); here so `-b` means the same as on `sbm pack`."
+        )
+        public var build: Bool
 
         public init() {}
 

@@ -97,14 +97,14 @@ extension ExecutableFlowSuite {
                 )
             }
 
-            Step("-t and -b run tests and benchmarks without overriding package.frame") {
+            Step("-t, -b and --bench run around the build without overriding package.frame") {
                 let spec = try SwiftBuildManagerMigrationCommand.spec()
 
-                let bare = try Arguments.parse(["-t", "-b"], spec: spec)
+                let bare = try Arguments.parse(["-t", "-b", "--benchmark"], spec: spec)
                 try Expect.equal(bare.commandPath.map(\.rawValue), ["sbm", "build"], "sbm -t -b is the default build")
                 let options = try bare.options(SwiftBuildCommand.Options.self)
-                try Expect.true(options.test && options.bench, "-t is test, -b is bench on build")
-                try Expect.false(SwiftBuildCommand.hasExplicitInput(bare), "-t/-b keep the package.frame build")
+                try Expect.true(options.test && options.build && options.bench, "-t test, -b build, --benchmark bench")
+                try Expect.false(SwiftBuildCommand.hasExplicitInput(bare), "-t/-b/--bench keep the package.frame build")
 
                 let debug = try Arguments.parse(["build", "-t", "-d"], spec: spec)
                 try Expect.true(SwiftBuildCommand.hasExplicitInput(debug), "a build flag still overrides package.frame")
@@ -112,7 +112,10 @@ extension ExecutableFlowSuite {
                 let pack = try Arguments.parse(["pack", "-b", "-t", "--bench"], spec: spec)
                 try Expect.equal(pack.commandPath.map(\.rawValue), ["sbm", "pack", "get"], "pack flags reach pack get")
                 let packOptions = try pack.options(SwiftPackGetCommand.Options.self)
-                try Expect.true(packOptions.build && packOptions.test && packOptions.bench, "-b is build on pack; --bench is long only")
+                try Expect.true(packOptions.build && packOptions.test && packOptions.bench, "-b is build on pack too")
+
+                let short = try Arguments.parse(["-b"], spec: spec).options(SwiftBuildCommand.Options.self)
+                try Expect.false(short.bench, "-b never means bench; bench has no short form")
             }
 
             Step("library command rejects contradictory modes") {

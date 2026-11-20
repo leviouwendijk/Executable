@@ -1,16 +1,16 @@
 import Arguments
 import Foundation
 
-/// Tests and benchmarks around a build: `sbm -t`, `sbm build -t -b`, `sbm pack -b -t --bench`.
-/// The meaning lives here; each command declares the flags, because their short forms differ
-/// (`-b` is bench on build but build on pack).
+/// Tests and benchmarks around a build: `sbm -t`, `sbm build -t --bench`, `sbm pack -b -t --bench`.
+/// The meaning lives here; `build` and `pack get` declare the same flags: `-t`/`--test`,
+/// `-b`/`--build`, `--bench`/`--benchmark` (no short form).
 ///
 /// Tests run before the build, so a failing test stops the deploy. Benchmarks run after it,
 /// in release, like `sbm bench`. Both run their package's primary products.
 public struct SwiftBuildFollowUp: Sendable, Equatable {
-    /// The long flag names. They choose what runs around the build, not how it builds, so they
-    /// don't count as explicit build input: `sbm -t` still applies package.frame.
-    static let flagNames: Set<ParamName> = ["test", "bench"]
+    /// The flag names that choose what runs around the build, not how it builds, so they don't
+    /// count as explicit build input: `sbm -t` still applies package.frame.
+    static let flagNames: Set<ParamName> = ["test", "bench", "build"]
 
     public var test: Bool
     public var bench: Bool

@@ -46,6 +46,7 @@ public enum SwiftPackGetCommand: BoundArgumentCommand {
 
         @Flag(
             "bench",
+            alias: "benchmark",
             help: "Run the Benchmarks/ package's primary products last (release)."
         )
         public var bench: Bool
