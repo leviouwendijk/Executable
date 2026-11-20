@@ -40,6 +40,12 @@ public enum ByteCount: Codable, Sendable, Hashable, Comparable, CustomStringConv
     }
 
     public init(from decoder: Decoder) throws {
+        if let single = try? decoder.singleValueContainer(), let text = try? single.decode(String.self) {
+            throw DecodingError.dataCorruptedError(
+                in: single,
+                debugDescription: "\"\(text)\" is a string; write a size as .megabytes(500) or .gigabytes(2.5)."
+            )
+        }
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let present = CodingKeys.allCases.filter(container.contains)
         guard present.count == 1, let key = present.first else {
