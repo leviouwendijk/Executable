@@ -43,7 +43,7 @@
       "location" : "https://github.com/leviouwendijk/Difference.git",
       "state" : {
         "branch" : "master",
-        "revision" : "a48b9b92bc5e82d258f07f5a80f198841ea4d82c"
+        "revision" : "173c7ee5598d3dba341f3205e717d76d46fb6fd5"
       }
     },
     {
@@ -88,7 +88,7 @@
       "location" : "https://github.com/leviouwendijk/Frame.git",
       "state" : {
         "branch" : "master",
-        "revision" : "cf4288b7212d831d585c9097b3cb27d240424cce"
+        "revision" : "5db8db8a4126e819024c5ce29a23cb68b0ef093c"
       }
     },
     {
@@ -187,7 +187,7 @@
       "location" : "https://github.com/leviouwendijk/Parsers.git",
       "state" : {
         "branch" : "master",
-        "revision" : "13b06fb7090e157bd5c269d26fa676eab94fecbb"
+        "revision" : "71946b149369d217504e31638aa35f0bc41a1164"
       }
     },
     {
@@ -196,7 +196,7 @@
       "location" : "https://github.com/leviouwendijk/Parsing.git",
       "state" : {
         "branch" : "master",
-        "revision" : "fd3f4869b1c4246954e89a410fbb71017242e2dd"
+        "revision" : "5f1e6085288011b7898bf3a8f476d1c347804f7d"
       }
     },
     {
@@ -232,7 +232,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "0c185c7cd2a829a47518a5134648b3cffc085b2a"
+        "revision" : "1e381664d669a5769f3e634ddada47ade4305db1"
       }
     },
     {
@@ -295,7 +295,7 @@
       "location" : "https://github.com/leviouwendijk/Search.git",
       "state" : {
         "branch" : "master",
-        "revision" : "db7f388464d5a27cf5dde43a0ee76d036458d4d3"
+        "revision" : "250c0d21a67ae5fdd42719592ca77121c2dd9743"
       }
     },
     {
@@ -349,7 +349,7 @@
       "location" : "https://github.com/leviouwendijk/Terminal.git",
       "state" : {
         "branch" : "master",
-        "revision" : "cf4a02a5562df0b128b1f41c7b9563a227bc24db"
+        "revision" : "dee3f32b77eff6a1f87cf0f366e7634c2657430a"
       }
     },
     {

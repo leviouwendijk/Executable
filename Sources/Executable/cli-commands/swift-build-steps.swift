@@ -1,3 +1,4 @@
+import Primitives
 import Arguments
 import Foundation
 import IO
@@ -44,18 +45,18 @@ public struct SwiftBuildSteps: Sendable, Equatable {
     }
 
     /// Before a build of `project`: tidy, then the tests.
-    public func before(at project: URL) async throws {
-        try await Self.tidy(packages(of: project), clean: cleanBefore, wipe: wipeBefore)
+    public func before(at project: URL, output: TextSink = .standard) async throws {
+        try await Self.tidy(packages(of: project), clean: cleanBefore, wipe: wipeBefore, output: output)
         guard test else { return }
-        try await SwiftTestCommand.run(at: project, selection: .primary, kind: .tests)
+        try await SwiftTestCommand.run(at: project, selection: .primary, kind: .tests, output: output)
     }
 
     /// After a build of `project`: the benchmarks, then tidy.
-    public func after(at project: URL) async throws {
+    public func after(at project: URL, output: TextSink = .standard) async throws {
         if bench {
-            try await SwiftTestCommand.run(at: project, selection: .primary, kind: .benchmarks)
+            try await SwiftTestCommand.run(at: project, selection: .primary, kind: .benchmarks, output: output)
         }
-        try await Self.tidyAfter(packages(of: project), clean: clean, wipe: wipe)
+        try await Self.tidyAfter(packages(of: project), clean: clean, wipe: wipe, output: output)
     }
 
     /// The root, and the nested packages this run uses.
@@ -79,43 +80,54 @@ public struct SwiftBuildSteps: Sendable, Equatable {
 
     /// After a successful run: `--wipe`, or else each package's own `.wipe = .{ .above = … }`
     /// when its caches have grown past it, then `--clean` for what wasn't wiped.
-    @_spi(Testing) public static func tidyAfter(_ packages: [URL], clean: Bool, wipe: Bool) async throws {
+    public static func tidyAfter(
+        _ packages: [URL],
+        clean: Bool,
+        wipe: Bool,
+        output: TextSink = .standard
+    ) async throws {
         guard !wipe else {
-            try await tidy(packages, clean: false, wipe: true)
+            try await tidy(packages, clean: false, wipe: true, output: output)
             return
         }
         var wiped: [URL] = []
         for package in packages {
             guard let policy = try? PackageFrame.wipe(in: package) else { continue }
-            if try await wipeAbove(policy.above, package: package) {
+            if try await wipeAbove(policy.above, package: package, output: output) {
                 wiped.append(package)
             }
         }
-        try await tidy(packages.filter { !wiped.contains($0) }, clean: clean, wipe: false)
+        try await tidy(packages.filter { !wiped.contains($0) }, clean: clean, wipe: false, output: output)
     }
 
     /// Measures the package's caches and wipes them when they exceed `above`. One walk.
-    static func wipeAbove(_ above: ByteCount, package: URL) async throws -> Bool {
+    static func wipeAbove(_ above: ByteCount, package: URL, output: TextSink) async throws -> Bool {
         let plan = try Wipe.plan([package], root: package, keep: KeepList.load(), measure: true)
         let total = plan.measuredTotal
         let name = package.lastPathComponent
         guard total > above.bytes else {
-            print("\(name): caches \(total.humanBytes), within .wipe.above \(above)")
+            output.line("\(name): caches \(total.humanBytes), within .wipe.above \(above)")
             return false
         }
-        print("\(name): caches \(total.humanBytes) exceed .wipe.above \(above) (package.frame); wiping")
-        try await SwiftWipePackageCommand.execute(plan, dryRun: false, interactive: false)
+        output.line("\(name): caches \(total.humanBytes) exceed .wipe.above \(above) (package.frame); wiping")
+        try await SwiftWipePackageCommand.execute(plan, dryRun: false, interactive: false, output: output)
         return true
     }
 
-    static func tidy(_ packages: [URL], clean: Bool, wipe: Bool) async throws {
+    /// Before a run: `wipe`, or else `clean`, for each package (the first is the plan's root).
+    public static func tidy(
+        _ packages: [URL],
+        clean: Bool,
+        wipe: Bool,
+        output: TextSink = .standard
+    ) async throws {
         guard let root = packages.first else { return }
         if wipe {
             let plan = try Wipe.plan(packages, root: root, keep: KeepList.load())
-            try await SwiftWipePackageCommand.execute(plan, dryRun: false, interactive: false)
+            try await SwiftWipePackageCommand.execute(plan, dryRun: false, interactive: false, output: output)
         } else if clean {
             for package in packages {
-                try await Build.clean(at: package)
+                try await Build.clean(at: package, output: output)
             }
         }
     }

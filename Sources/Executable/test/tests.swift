@@ -1,3 +1,4 @@
+import Primitives
 import Foundation
 import IO
 
@@ -153,13 +154,13 @@ public enum Tests {
         }
     }
 
-    public static func execute(_ plan: Plan) async throws {
+    public static func execute(_ plan: Plan, output: TextSink = .standard) async throws {
         for run in plan.runs {
             for product in run.products {
-                print("Running \(product)…")
+                output.line("Running \(product)…")
                 let result = try await SwiftRun.run(.init(product: product, mode: run.mode), at: run.package)
-                if !result.stdoutText.isEmpty { print(result.stdoutText, terminator: "") }
-                if !result.stderrText.isEmpty { fputs(result.stderrText, stderr) }
+                if !result.stdoutText.isEmpty { output.write(result.stdoutText) }
+                if !result.stderrText.isEmpty { output.write(result.stderrText, to: .error) }
                 guard result.isSuccess else {
                     throw RunError.failed(product: product, exitCode: result.exitCode, signal: result.signal)
                 }

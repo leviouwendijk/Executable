@@ -1,3 +1,4 @@
+import Primitives
 import Foundation
 import IO
 import Path
@@ -209,6 +210,85 @@ public enum Wipe {
                 throw WipeError.not_empty(detached, remaining: left.count, sample: left.prefix(5).map(\.url.path))
             }
         }
+    }
+
+    /// What a run of a plan did. `freed` is the volume's gain in available space, nil for a dry
+    /// run or when the volume could not be read.
+    public struct Summary: Sendable, Equatable {
+        public var packages: Int
+        public var deleted = 0
+        public var kept = 0
+        public var skipped = 0
+        public var failed = 0
+        public var freed: Int64?
+    }
+
+    /// Runs a plan, reporting per directory and in total. `confirm` asks before each deletion
+    /// except leftovers (the CLI without -y); a refusal counts as skipped. Failed deletions are
+    /// reported and counted, not thrown.
+    @discardableResult
+    public static func execute(
+        _ plan: Plan,
+        dryRun: Bool = false,
+        confirm: ((String) -> Bool)? = nil,
+        output: TextSink = .standard
+    ) async -> Summary {
+        var summary = Summary(packages: plan.packages.count)
+        guard !plan.packages.isEmpty else {
+            output.line("No packages under \(plan.root.path).")
+            return summary
+        }
+        let before = try? FileSystem.default.volume(of: plan.root).available
+
+        func label(_ item: Item) -> String {
+            let relative = item.directory.path.hasPrefix(plan.root.path + "/")
+                ? String(item.directory.path.dropFirst(plan.root.path.count + 1))
+                : item.directory.path
+            return relative + (item.size.map { " (\($0.humanBytes))" } ?? "")
+        }
+
+        for item in plan.leftovers + plan.items {
+            switch item.decision {
+            case .kept(let entry, let reason):
+                summary.kept += 1
+                output.line("→ kept \(label(item)) (keep: \(entry)\(reason.map { ", \($0)" } ?? ""))")
+                continue
+            case .running(let holder):
+                summary.skipped += 1
+                output.line("→ skipped \(label(item)): build running (\(holder.executable), pid \(holder.pid))")
+                continue
+            case .delete:
+                break
+            }
+
+            let leftover = isLeftover(item.directory.lastPathComponent)
+            if dryRun {
+                output.line("would delete \(leftover ? "leftover " : "")\(label(item))")
+                continue
+            }
+            if let confirm, !leftover, !confirm("Delete \(label(item))?") {
+                summary.skipped += 1
+                continue
+            }
+            do {
+                try await remove(item)
+                summary.deleted += 1
+                output.line("✓ deleted \(label(item))")
+            } catch {
+                summary.failed += 1
+                output.line("✗ \(label(item)): \(error.localizedDescription)")
+            }
+        }
+
+        if dryRun {
+            output.line("\(plan.packages.count) packages; would free \(plan.measuredTotal.humanBytes) (\(plan.deletions.count) directories)")
+            return summary
+        }
+        summary.freed = before.flatMap { before in
+            (try? FileSystem.default.volume(of: plan.root).available).map { max(0, $0 - before) }
+        }
+        output.line("\(plan.packages.count) packages: \(summary.deleted) deleted, \(summary.kept) kept, \(summary.skipped) skipped, \(summary.failed) failed; freed ≈\((summary.freed ?? 0).humanBytes)")
+        return summary
     }
 }
 

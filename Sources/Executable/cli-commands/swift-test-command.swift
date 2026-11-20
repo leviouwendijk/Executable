@@ -1,3 +1,4 @@
+import Primitives
 import Arguments
 import Foundation
 import IO
@@ -71,7 +72,8 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         at root: URL,
         selection: TestConfiguration.Selection,
         kind: Tests.Kind,
-        steps: SwiftBuildSteps? = nil
+        steps: SwiftBuildSteps? = nil,
+        output: TextSink = .standard
     ) async throws {
         let plan = try await Tests.resolve(at: root, selection: selection, kind: kind)
         var packages: [URL] = []
@@ -79,14 +81,14 @@ public enum SwiftTestCommand: BoundArgumentCommand {
             packages.append(run.package)
         }
         if let steps {
-            try await SwiftBuildSteps.tidy(packages, clean: steps.cleanBefore, wipe: steps.wipeBefore)
+            try await SwiftBuildSteps.tidy(packages, clean: steps.cleanBefore, wipe: steps.wipeBefore, output: output)
         }
         for run in plan.runs {
-            print("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")
+            output.line("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")
         }
-        try await Tests.execute(plan)
+        try await Tests.execute(plan, output: output)
         if let steps {
-            try await SwiftBuildSteps.tidyAfter(packages, clean: steps.clean, wipe: steps.wipe)
+            try await SwiftBuildSteps.tidyAfter(packages, clean: steps.clean, wipe: steps.wipe, output: output)
         }
     }
 }

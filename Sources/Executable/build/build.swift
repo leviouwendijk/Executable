@@ -1,3 +1,4 @@
+import Primitives
 import Foundation
 import plate
 import Interfaces
@@ -47,9 +48,11 @@ public enum Build {
     }
 
     /// `swift package clean`
-    public static func clean(at dir: URL) async throws {
-        _ = try await runSwift(command: ["package", "clean"], in: dir)
-        print("\nClean successful!".ansi(.green))
+    public static func clean(at dir: URL, output: TextSink = .standard) async throws {
+        _ = try await runSwift(command: ["package", "clean"], in: dir) { chunk in
+            output.write(chunk)
+        }
+        output.line("\nClean successful!".ansi(.green))
     }
 
     public struct BuildResult: Sendable {
