@@ -11,7 +11,7 @@ import IO
 /// wipes. Each command tidies the packages it worked in: build the root (plus Tests/ with -t,
 /// Benchmarks/ with --bench), test the Tests/ package, bench the Benchmarks/ package. The keep
 /// list applies (`sbm keep`). After-steps run only when the command succeeded. Without
-/// `--wipe`, a package whose package.frame says `.wipe = .{ .above = "2G" }` is wiped after a
+/// `--wipe`, a package whose package.frame says `.wipe = .{ .above = .gigabytes(2) }` is wiped after a
 /// successful run when its caches exceed that size.
 public struct SwiftBuildSteps: Sendable, Equatable {
     /// Flags that choose what runs around the build, not how it builds, so they don't count as
@@ -100,10 +100,10 @@ public struct SwiftBuildSteps: Sendable, Equatable {
         let total = plan.measuredTotal
         let name = package.lastPathComponent
         guard total > above.bytes else {
-            print("\(name): caches \(total.humanBytes), within .wipe.above \(above.raw)")
+            print("\(name): caches \(total.humanBytes), within .wipe.above \(above)")
             return false
         }
-        print("\(name): caches \(total.humanBytes) exceed .wipe.above \(above.raw) (package.frame); wiping")
+        print("\(name): caches \(total.humanBytes) exceed .wipe.above \(above) (package.frame); wiping")
         try await SwiftWipePackageCommand.execute(plan, dryRun: false, interactive: false)
         return true
     }

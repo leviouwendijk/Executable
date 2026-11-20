@@ -264,8 +264,7 @@ extension PackageFrame {
 
         static var frameSchema: Frame.Schema {
             .object([
-                .init("above", .string, required: true,
-                      summary: "A size like \"2G\" or \"500M\": after a successful run here, wipe .build and .index-build when together they exceed it."),
+                .init("above", .init(.any, summary: "A size: .megabytes(500), .gigabytes(2.5) (also .kilobytes, .terabytes); after a successful run here, wipe .build and .index-build when together they exceed it."), required: true),
             ], summary: "Wipe this package's caches after a successful build, test or bench run when they grow past a size (the keep list applies).")
         }
     }

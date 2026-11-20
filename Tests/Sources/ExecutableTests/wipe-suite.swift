@@ -153,32 +153,31 @@ extension ExecutableTestSuite {
             try Expect.equal(try names(.main, recursive: true, root: fixture.root), ["IO", "other/Tests"])
         }
 
-        Test("sizes parse in binary units; anything else is rejected") {
-            try Expect.equal(try ByteCount("2G").bytes, 2 << 30)
-            try Expect.equal(try ByteCount("500m").bytes, 500 << 20)
-            try Expect.equal(try ByteCount("1.5GiB").bytes, 3 << 29)
-            try Expect.equal(try ByteCount("2GB").bytes, 2 << 30)
-            try Expect.equal(try ByteCount("4096").bytes, 4096)
-            try Expect.equal(try ByteCount("2G").raw, "2G", "the raw value is kept as written")
-            for bad in ["", "G", "-1G", "2X", "two"] {
-                try Expect.true((try? ByteCount(bad)) == nil, "'\(bad)' is rejected")
-            }
+        Test("sizes are .kilobytes/.megabytes/.gigabytes/.terabytes in binary units") {
+            try Expect.equal(ByteCount.gigabytes(2).bytes, 2 << 30)
+            try Expect.equal(ByteCount.megabytes(500).bytes, 500 << 20)
+            try Expect.equal(ByteCount.gigabytes(1.5).bytes, 3 << 29)
+            try Expect.equal(ByteCount.kilobytes(4).bytes, 4096)
+            try Expect.equal(ByteCount.gigabytes(2.5).description, "2.5G")
+            try Expect.equal(ByteCount.megabytes(500).description, "500M")
+            try Expect.true(ByteCount.megabytes(1024) < ByteCount.gigabytes(1.5), "compared by bytes")
         }
 
-        Test(".wipe.above parses in all three kinds, round-trips, and rejects a bad size") {
-            let package = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"2G\" } };")
-            try Expect.equal(package, .package(.init(wipe: .init(above: try ByteCount("2G")))))
-            let tests = try PackageFrame.parse("import Executable;\nlet tests: Tests = .{ .primary = \"t_x\", .wipe = .{ .above = \"500M\" } };")
-            try Expect.equal(tests, .tests(.init(primary: "t_x", wipe: .init(above: try ByteCount("500M")))))
-            let benchmarks = try PackageFrame.parse("import Executable;\nlet benchmarks: Benchmarks = .{ .wipe = .{ .above = \"1G\" } };")
-            try Expect.equal(benchmarks, .benchmarks(.init(wipe: .init(above: try ByteCount("1G")))))
+        Test(".wipe.above reads .gigabytes(n) in all three kinds, round-trips, and rejects anything else") {
+            let package = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = .gigabytes(2.5) } };")
+            try Expect.equal(package, .package(.init(wipe: .init(above: .gigabytes(2.5)))))
+            let tests = try PackageFrame.parse("import Executable;\nlet tests: Tests = .{ .primary = \"t_x\", .wipe = .{ .above = .megabytes(500) } };")
+            try Expect.equal(tests, .tests(.init(primary: "t_x", wipe: .init(above: .megabytes(500)))))
+            let benchmarks = try PackageFrame.parse("import Executable;\nlet benchmarks: Benchmarks = .{ .wipe = .{ .above = .gigabytes(1) } };")
+            try Expect.equal(benchmarks, .benchmarks(.init(wipe: .init(above: .gigabytes(1)))))
 
-            let written = try PackageFrame.source(PackageConfiguration(wipe: .init(above: try ByteCount("3G"))))
-            try Expect.true(written.contains("\"3G\""), "the size is written as given")
-            try Expect.equal(try PackageFrame.parse(written), .package(.init(wipe: .init(above: try ByteCount("3G")))))
+            let written = try PackageFrame.source(PackageConfiguration(wipe: .init(above: .gigabytes(3))))
+            try Expect.equal(try PackageFrame.parse(written), .package(.init(wipe: .init(above: .gigabytes(3)))), "written and read back")
 
-            _ = try Expect.throwsError(Error.self) {
-                _ = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"lots\" } };")
+            for bad in ["\"2G\"", ".gigabytes(-1)", ".petabytes(1)", ".{ .gigabytes = 1, .megabytes = 2 }"] {
+                _ = try Expect.throwsError(Error.self) {
+                    _ = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = \(bad) } };")
+                }
             }
         }
 
@@ -189,7 +188,7 @@ extension ExecutableTestSuite {
             let large = try fixture.package("large", caches: [".build", ".index-build"])
             try Data(repeating: 1, count: 2 << 20).write(to: large.appendingPathComponent(".build/blob"))
             for package in [small, large] {
-                try "import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"1M\" } };\n"
+                try "import Executable;\nlet package: Package = .{ .wipe = .{ .above = .megabytes(1) } };\n"
                     .write(to: package.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
             }
             let none = try fixture.package("none", caches: [".build"])
