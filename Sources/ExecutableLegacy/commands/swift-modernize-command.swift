@@ -1,6 +1,7 @@
 import Executable
 import Arguments
 import Foundation
+import Version
 
 public enum SwiftModernizeCommand: BoundArgumentCommand {
     public static let name = "modernize"
@@ -106,11 +107,11 @@ public enum SwiftModernizeCommand: BoundArgumentCommand {
         }
         switch result.tag {
         case .existing(let version):
-            print("  release \(ReleaseTags.name(for: version)) (already tagged)")
+            print("  release \(ReleaseTag.name(for: version)) (already tagged)")
         case .tagged(let version):
-            print("  release \(ReleaseTags.name(for: version)) (tagged HEAD and pushed)")
+            print("  release \(ReleaseTag.name(for: version)) (tagged HEAD and pushed)")
         case .skipped(let version, let reason):
-            print("  release \(ReleaseTags.name(for: version)) not tagged: \(reason)")
+            print("  release \(ReleaseTag.name(for: version)) not tagged: \(reason)")
         }
         if result.unsplitTests {
             print("  tests   still in the root package; Tests/package.frame declares them until they move into Tests/")

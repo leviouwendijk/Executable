@@ -2,6 +2,7 @@ import Executable
 import Foundation
 import Path
 import Version
+import Interfaces
 
 /// Moves a build-object.pkl project to package.frame:
 ///
@@ -189,10 +190,10 @@ public enum PackageFrameMigration {
 
     static func tagRelease(_ version: ObjectVersion, at project: URL) async throws -> TagOutcome {
         do {
-            if let latest = try await ReleaseTags.latest(at: project) {
+            if let latest = try await GitRepo.latestRelease(at: project) {
                 return .existing(latest)
             }
-            try await ReleaseTags.create(version, at: project)
+            try await GitRepo.release(.exact(version), at: project)
             return .tagged(version)
         } catch {
             // Not a repository, dirty, unpushed, already released, or no upstream:

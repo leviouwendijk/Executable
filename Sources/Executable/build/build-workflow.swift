@@ -239,6 +239,21 @@ public extension Build {
             )
         }
 
+        let identity = await BuildIdentity.current(at: plan.request.project)
+
+        // The build succeeded (it throws otherwise): record what it was built from, so a
+        // renewal knows whether these products are current, deployed or not.
+        do {
+            try BuildRecord.write(
+                products: plan.selectedProductNames,
+                project: plan.request.project,
+                mode: plan.request.config.mode,
+                identity: identity
+            )
+        } catch {
+            print("Build record not written: \(error.localizedDescription)".ansi(.yellow))
+        }
+
         if plan.request.deploy {
             try Deploy.selected(
                 from: plan.request.project,
@@ -246,7 +261,7 @@ public extension Build {
                 to: plan.request.destination,
                 products: plan.selectedProductNames,
                 perProductDestinations: plan.perProductDestinations,
-                identity: await BuildIdentity.current(at: plan.request.project)
+                identity: identity
             )
         }
 

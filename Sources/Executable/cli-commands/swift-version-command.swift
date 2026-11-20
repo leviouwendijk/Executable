@@ -4,6 +4,7 @@ import Indentation
 import plate
 
 import Interfaces
+import Version
 
 public enum SwiftVersionCommand: RunnableArgumentCommand {
     public static let name = "version"
@@ -26,7 +27,7 @@ public enum SwiftVersionCommand: RunnableArgumentCommand {
 
         if let package = try PackageFrame.package(in: current) {
             let status = try await PackageVersionStatus.inspect(at: current, configuration: package)
-            print("release:  \(status.release.map(ReleaseTags.name(for:)) ?? "untagged")")
+            print("release:  \(status.release.map(ReleaseTag.name(for:)) ?? "untagged")")
             if let head = status.head {
                 print("head:     \(head.commit.prefix(12))\(head.dirty ? " (dirty)" : "")")
             }
@@ -35,9 +36,16 @@ public enum SwiftVersionCommand: RunnableArgumentCommand {
                     print("deployed: \(entry.product) never deployed")
                     continue
                 }
-                let version = metadata.version.map(ReleaseTags.name(for:)) ?? "untagged"
+                let version = metadata.version.map(ReleaseTag.name(for:)) ?? "untagged"
                 let commit = metadata.commit.map { String($0.prefix(12)) } ?? "unknown commit"
                 print("deployed: \(entry.product) \(version) at \(commit)\(metadata.dirty ? " (dirty)" : "")")
+            }
+            for entry in status.built {
+                guard let metadata = entry.metadata, let commit = metadata.commit else {
+                    print("built:    \(entry.product) no build record")
+                    continue
+                }
+                print("built:    \(entry.product) at \(commit.prefix(12))\(metadata.dirty ? " (dirty)" : "")")
             }
             if !status.behind.isEmpty {
                 print("behind:   \(status.behind.joined(separator: ", "))")

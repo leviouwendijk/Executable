@@ -1,5 +1,7 @@
 import Arguments
 import Foundation
+import Interfaces
+import Version
 
 public enum SwiftReleaseCommand: RunnableArgumentCommand {
     public static let name = "release"
@@ -31,14 +33,14 @@ public enum SwiftReleaseCommand: RunnableArgumentCommand {
         _ invocation: ParsedInvocation
     ) async throws {
         let text = try invocation.require("version", as: String.self)
-        guard let version = ReleaseTags.version(of: text) else {
+        guard let version = ReleaseTag.version(of: text) else {
             throw CommandError.invalidVersion(text)
         }
         let directory = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
             isDirectory: true
         )
-        try await ReleaseTags.create(version, at: directory)
-        print("Tagged \(ReleaseTags.name(for: version)) and pushed the tag.")
+        try await GitRepo.release(.exact(version), at: directory)
+        print("Tagged \(ReleaseTag.name(for: version)) and pushed the tag.")
     }
 }

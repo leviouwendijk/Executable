@@ -2,6 +2,7 @@ import Executable
 import Foundation
 import Interfaces
 import Testing
+import Version
 
 extension ExecutableTestSuite {
     static let releaseTagsSuite = TestSuite(
@@ -10,30 +11,30 @@ extension ExecutableTestSuite {
         tags: ["executable", "version", "git"]
     ) {
         Test("release tags are bare or v-prefixed semver, nothing else") {
-            try Expect.equal(ReleaseTags.version(of: "1.2.3"), .init(major: 1, minor: 2, patch: 3), "bare tag")
-            try Expect.equal(ReleaseTags.version(of: "v1.2.3"), .init(major: 1, minor: 2, patch: 3), "v-prefixed tag is read")
+            try Expect.equal(ReleaseTag.version(of: "1.2.3"), .init(major: 1, minor: 2, patch: 3), "bare tag")
+            try Expect.equal(ReleaseTag.version(of: "v1.2.3"), .init(major: 1, minor: 2, patch: 3), "v-prefixed tag is read")
             for tag in ["1.2", "1.2.3.4", "1.2.x", "release-1.2.3", "1..3", "", "v"] {
-                try Expect.isNil(ReleaseTags.version(of: tag), "'\(tag)' is not a release tag")
+                try Expect.isNil(ReleaseTag.version(of: tag), "'\(tag)' is not a release tag")
             }
-            try Expect.equal(ReleaseTags.name(for: .init(major: 0, minor: 4, patch: 1)), "0.4.1", "written tags are bare")
+            try Expect.equal(ReleaseTag.name(for: .init(major: 0, minor: 4, patch: 1)), "0.4.1", "written tags are bare")
         }
 
         Test("increment tags HEAD with the next bare version and pushes it") {
             let fixture = try await TagFixture()
             defer { fixture.remove() }
-            try Expect.isNil(try await ReleaseTags.latest(at: fixture.work), "no release before the first tag")
+            try Expect.isNil(try await GitRepo.latestRelease(at: fixture.work), "no release before the first tag")
 
-            let first = try await ReleaseTags.increment(.minor, at: fixture.work)
+            let first = try await GitRepo.release(.next(.minor), at: fixture.work)
             try Expect.isNil(first.from, "first release starts from nothing")
             try Expect.equal(first.to, .init(major: 0, minor: 1, patch: 0), "minor from nothing is 0.1.0")
             try Expect.contains(try await fixture.remoteTags(), "0.1.0", "the tag is pushed")
 
             try await fixture.commit("second")
             try await fixture.git(["tag", "-a", "v0.3.0", "-m", "v0.3.0"])
-            try Expect.equal(try await ReleaseTags.latest(at: fixture.work), .init(major: 0, minor: 3, patch: 0), "v-prefixed tags count as releases")
+            try Expect.equal(try await GitRepo.latestRelease(at: fixture.work), .init(major: 0, minor: 3, patch: 0), "v-prefixed tags count as releases")
 
             try await fixture.commit("third")
-            let next = try await ReleaseTags.increment(.patch, at: fixture.work)
+            let next = try await GitRepo.release(.next(.patch), at: fixture.work)
             try Expect.equal(next.to, .init(major: 0, minor: 3, patch: 1), "the next release follows the newest tag")
         }
 
@@ -43,37 +44,37 @@ extension ExecutableTestSuite {
 
             try "changed".write(to: fixture.work.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
             try await Expect.throwsError("uncommitted changes") {
-                _ = try await ReleaseTags.increment(.patch, at: fixture.work)
+                _ = try await GitRepo.release(.next(.patch), at: fixture.work)
             }
             try await fixture.git(["checkout", "--", "file.txt"])
 
             try await fixture.commit("local only", push: false)
             try await Expect.throwsError("commits not on the remote") {
-                _ = try await ReleaseTags.increment(.patch, at: fixture.work)
+                _ = try await GitRepo.release(.next(.patch), at: fixture.work)
             }
             try await fixture.git(["push"])
 
-            _ = try await ReleaseTags.increment(.patch, at: fixture.work)
+            _ = try await GitRepo.release(.next(.patch), at: fixture.work)
             try await Expect.throwsError("HEAD already carries a release") {
-                _ = try await ReleaseTags.increment(.patch, at: fixture.work)
+                _ = try await GitRepo.release(.next(.patch), at: fixture.work)
             }
         }
 
         Test("create tags an exact version, never one at or below the latest release") {
             let fixture = try await TagFixture()
             defer { fixture.remove() }
-            try await ReleaseTags.create(.init(major: 2, minor: 0, patch: 1), at: fixture.work)
+            try await GitRepo.release(.exact(.init(major: 2, minor: 0, patch: 1)), at: fixture.work)
             try Expect.contains(try await fixture.remoteTags(), "2.0.1", "the exact version is tagged and pushed")
 
             try await fixture.commit("next")
             try await Expect.throwsError("an older version is refused") {
-                try await ReleaseTags.create(.init(major: 1, minor: 9, patch: 0), at: fixture.work)
+                try await GitRepo.release(.exact(.init(major: 1, minor: 9, patch: 0)), at: fixture.work)
             }
             try await Expect.throwsError("the same version is refused") {
-                try await ReleaseTags.create(.init(major: 2, minor: 0, patch: 1), at: fixture.work)
+                try await GitRepo.release(.exact(.init(major: 2, minor: 0, patch: 1)), at: fixture.work)
             }
-            try await ReleaseTags.create(.init(major: 2, minor: 1, patch: 0), at: fixture.work)
-            try Expect.equal(try await ReleaseTags.latest(at: fixture.work), .init(major: 2, minor: 1, patch: 0), "a newer version is tagged")
+            try await GitRepo.release(.exact(.init(major: 2, minor: 1, patch: 0)), at: fixture.work)
+            try Expect.equal(try await GitRepo.latestRelease(at: fixture.work), .init(major: 2, minor: 1, patch: 0), "a newer version is tagged")
         }
 
         Test("deployed products are behind until a deploy records the released version") {
@@ -86,7 +87,7 @@ extension ExecutableTestSuite {
             let untagged = try await PackageVersionStatus.inspect(at: fixture.work, configuration: package, deployedTo: deployRoot)
             try Expect.equal(untagged.behind, ["tool"], "a product never deployed is behind")
 
-            _ = try await ReleaseTags.increment(.minor, at: fixture.work)
+            _ = try await GitRepo.release(.next(.minor), at: fixture.work)
             let head = try await fixture.git(["rev-parse", "HEAD"])
             try "ProjectRootPath=/x\nVersion=0.0.9\nCommit=\(head)\nDirty=false\n"
                 .write(to: deployRoot.appendingPathComponent("tool.metadata"), atomically: true, encoding: .utf8)
@@ -106,6 +107,58 @@ extension ExecutableTestSuite {
 
             let library = try await PackageVersionStatus.inspect(at: fixture.work, configuration: PackageConfiguration(), deployedTo: deployRoot)
             try Expect.equal(library.behind, [], "nothing to deploy is never behind")
+        }
+
+        Test("a commit with a release tags it and pushes branch and tag together; a stale version commits nothing") {
+            let fixture = try await TagFixture()
+            defer { fixture.remove() }
+
+            try "released".write(to: fixture.work.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+            _ = try await GitManagerAction.commit(message: "released", push: false, release: .next(.minor), at: fixture.work)
+            try Expect.contains(try await fixture.remoteTags(), "0.1.0", "the tag reaches the remote")
+            try Expect.equal(
+                try await fixture.git(["rev-parse", "origin/master"]),
+                try await fixture.git(["rev-parse", "HEAD"]),
+                "the branch is pushed with it, although push was false"
+            )
+
+            let before = try await fixture.git(["rev-parse", "HEAD"])
+            try "stale".write(to: fixture.work.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+            try await Expect.throwsError("a version not newer than the latest release") {
+                _ = try await GitManagerAction.commit(message: "stale", push: true, release: .exact(.init(major: 0, minor: 0, patch: 1)), at: fixture.work)
+            }
+            try Expect.equal(try await fixture.git(["rev-parse", "HEAD"]), before, "nothing was committed")
+        }
+
+        Test("local products are the --products of a package without .deploy") {
+            try Expect.equal(PackageConfiguration(buildArguments: ["--products", "app"]).localProducts, ["app"], "one product")
+            try Expect.equal(PackageConfiguration(buildArguments: ["--products", "a", "b", "--no-move"]).localProducts, ["a", "b"], "values until the next flag")
+            try Expect.equal(PackageConfiguration(buildArguments: ["--products", "a,b"]).localProducts, ["a", "b"], "comma-separated values")
+            try Expect.equal(PackageConfiguration(buildArguments: ["--products", "app"], deployProducts: ["app"]).localProducts, [], "deployed products are not local")
+            try Expect.equal(PackageConfiguration(buildArguments: ["--skip-products", "x"]).localProducts, [], "other flags name no local products")
+        }
+
+        Test("local products are behind until a build records HEAD, and again after a pull") {
+            let fixture = try await TagFixture()
+            defer { fixture.remove() }
+            let deployRoot = fixture.root.appendingPathComponent("sbm-bin", isDirectory: true)
+            let package = PackageConfiguration(buildArguments: ["--products", "app"])
+
+            let never = try await PackageVersionStatus.inspect(at: fixture.work, configuration: package, deployedTo: deployRoot)
+            try Expect.equal(never.behind, ["app"], "a product never built is behind")
+
+            try BuildRecord.write(products: ["app"], project: fixture.work, mode: .release, identity: await BuildIdentity.current(at: fixture.work))
+            let current = try await PackageVersionStatus.inspect(at: fixture.work, configuration: package, deployedTo: deployRoot)
+            try Expect.equal(current.behind, [], "a build of HEAD is current, without any release")
+            try Expect.equal(current.built.first?.metadata?.commit, try await fixture.git(["rev-parse", "HEAD"]), "the record holds the built commit")
+
+            try await fixture.commit("pulled")
+            let pulled = try await PackageVersionStatus.inspect(at: fixture.work, configuration: package, deployedTo: deployRoot)
+            try Expect.equal(pulled.behind, ["app"], "a new commit makes the product behind, no tag needed")
+
+            try FileManager.default.removeItem(at: fixture.work.appendingPathComponent(".build"))
+            let wiped = try await PackageVersionStatus.inspect(at: fixture.work, configuration: package, deployedTo: deployRoot)
+            try Expect.equal(wiped.behind, ["app"], "wiping .build removes the record with the binary")
         }
     }
 }

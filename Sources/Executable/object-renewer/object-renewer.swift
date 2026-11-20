@@ -4,6 +4,7 @@ import plate
 import Processes
 import Terminal
 import Indentation
+import Version
 
 public struct ObjectRenewer: Sendable {
     public init() {}
@@ -171,9 +172,9 @@ public struct ObjectRenewer: Sendable {
             // The release is the newest tag; each deployed product's metadata says what it was built from.
             let status = try await PackageVersionStatus.inspect(at: resolvedPaths.directory, configuration: package)
             if status.behind.isEmpty {
-                printi("Deployed products are current; skipping compile.")
+                printi("Products are current; skipping compile.")
             } else {
-                printi("Behind the release (\(status.release.map(ReleaseTags.name(for:)) ?? "untagged")): \(status.behind.joined(separator: ", ")); compiling…")
+                printi("Behind (release \(status.release.map(ReleaseTag.name(for:)) ?? "untagged"), head \(status.head.map { String($0.commit.prefix(12)) } ?? "unknown")): \(status.behind.joined(separator: ", ")); compiling…")
                 try await execute(in: resolvedPaths.directory)
             }
         } else if compilable,

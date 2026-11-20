@@ -28,6 +28,25 @@ public struct PackageConfiguration: Sendable, Equatable {
         self.wipe = wipe
     }
 
+    /// Products a flagless `sbm build` builds without deploying them: the `--products` in
+    /// `.build.arguments` of a package without `.deploy` (an app that runs from its own `.app`).
+    public var localProducts: [String] {
+        guard deployProducts == nil else { return [] }
+        var products: [String] = []
+        var collecting = false
+        for argument in buildArguments {
+            if argument.hasPrefix("-") {
+                collecting = argument == "--products"
+                continue
+            }
+            guard collecting else { continue }
+            products += argument.split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }.filter { !$0.isEmpty }
+        }
+        return products
+    }
+
     /// The flags a flagless `sbm build` runs with, or nil for a plain release build without deploy.
     public var flaglessArguments: [String]? {
         let arguments = (mode == .debug ? ["--debug"] : []) + buildArguments

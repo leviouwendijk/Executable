@@ -1,6 +1,7 @@
 import Arguments
 import Foundation
 import Version
+import Interfaces
 
 public enum SwiftIncrementCommand: RunnableArgumentCommand {
     public static let name = "increment"
@@ -37,9 +38,9 @@ public enum SwiftIncrementCommand: RunnableArgumentCommand {
             throw BuildObjectDiscoveryError.notFound(filename: PackageFrame.fileName, maxDepth: 1, startURL: directory)
         }
 
-        let result = try await ReleaseTags.increment(level, at: directory)
+        let result = try await GitRepo.release(.next(level), at: directory)
         print(
-            "Tagged \(ReleaseTags.name(for: result.to)) (was \(result.from.map(ReleaseTags.name(for:)) ?? "untagged")) and pushed the tag."
+            "Tagged \(ReleaseTag.name(for: result.to)) (was \(result.from.map(ReleaseTag.name(for:)) ?? "untagged")) and pushed the tag."
         )
     }
 }
