@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import Executable
+@_spi(Testing) import Executable
 
 extension ExecutableTestSuite {
     static let wipeSuite = TestSuite(
@@ -151,6 +151,56 @@ extension ExecutableTestSuite {
             try Expect.equal(try names(.extra, recursive: true, root: fixture.root), ["IO/Benchmarks", "IO/Tests"],
                              "a Tests/ without package.frame saying tests is not wiped by extra")
             try Expect.equal(try names(.main, recursive: true, root: fixture.root), ["IO", "other/Tests"])
+        }
+
+        Test("sizes parse in binary units; anything else is rejected") {
+            try Expect.equal(try ByteCount("2G").bytes, 2 << 30)
+            try Expect.equal(try ByteCount("500m").bytes, 500 << 20)
+            try Expect.equal(try ByteCount("1.5GiB").bytes, 3 << 29)
+            try Expect.equal(try ByteCount("2GB").bytes, 2 << 30)
+            try Expect.equal(try ByteCount("4096").bytes, 4096)
+            try Expect.equal(try ByteCount("2G").raw, "2G", "the raw value is kept as written")
+            for bad in ["", "G", "-1G", "2X", "two"] {
+                try Expect.true((try? ByteCount(bad)) == nil, "'\(bad)' is rejected")
+            }
+        }
+
+        Test(".wipe.above parses in all three kinds, round-trips, and rejects a bad size") {
+            let package = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"2G\" } };")
+            try Expect.equal(package, .package(.init(wipe: .init(above: try ByteCount("2G")))))
+            let tests = try PackageFrame.parse("import Executable;\nlet tests: Tests = .{ .primary = \"t_x\", .wipe = .{ .above = \"500M\" } };")
+            try Expect.equal(tests, .tests(.init(primary: "t_x", wipe: .init(above: try ByteCount("500M")))))
+            let benchmarks = try PackageFrame.parse("import Executable;\nlet benchmarks: Benchmarks = .{ .wipe = .{ .above = \"1G\" } };")
+            try Expect.equal(benchmarks, .benchmarks(.init(wipe: .init(above: try ByteCount("1G")))))
+
+            let written = try PackageFrame.source(PackageConfiguration(wipe: .init(above: try ByteCount("3G"))))
+            try Expect.true(written.contains("\"3G\""), "the size is written as given")
+            try Expect.equal(try PackageFrame.parse(written), .package(.init(wipe: .init(above: try ByteCount("3G")))))
+
+            _ = try Expect.throwsError(Error.self) {
+                _ = try PackageFrame.parse("import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"lots\" } };")
+            }
+        }
+
+        Test("after a run, caches over .wipe.above are wiped and caches under it stay") {
+            let fixture = try WipeFixture()
+            defer { fixture.remove() }
+            let small = try fixture.package("small", caches: [".build"])
+            let large = try fixture.package("large", caches: [".build", ".index-build"])
+            try Data(repeating: 1, count: 2 << 20).write(to: large.appendingPathComponent(".build/blob"))
+            for package in [small, large] {
+                try "import Executable;\nlet package: Package = .{ .wipe = .{ .above = \"1M\" } };\n"
+                    .write(to: package.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
+            }
+            let none = try fixture.package("none", caches: [".build"])
+            try Data(repeating: 1, count: 2 << 20).write(to: none.appendingPathComponent(".build/blob"))
+
+            try await SwiftBuildSteps.tidyAfter([small, large, none], clean: false, wipe: false)
+
+            try Expect.true(FileManager.default.fileExists(atPath: small.appendingPathComponent(".build").path), "under the threshold stays")
+            try Expect.false(FileManager.default.fileExists(atPath: large.appendingPathComponent(".build").path), "over the threshold is wiped")
+            try Expect.false(FileManager.default.fileExists(atPath: large.appendingPathComponent(".index-build").path), "both caches count and go")
+            try Expect.true(FileManager.default.fileExists(atPath: none.appendingPathComponent(".build").path), "no policy, no wipe")
         }
 
         Test("remove detaches then deletes; the cache name is free again") {

@@ -60,24 +60,30 @@ public enum SwiftTestCommand: BoundArgumentCommand {
         try await run(at: root, selection: selection, kind: kind, steps: SwiftBuildSteps().with(options.tidy))
     }
 
-    /// Runs the plan, tidying the packages it runs in before and after (`--wipe`, `--clean`, …).
+    /// Runs the plan. With `steps` (the `test`/`bench` commands themselves), tidies the packages
+    /// it ran in before and after, including their `.wipe.above`; build and pack pass none,
+    /// because their own after-step covers these packages.
     static func run(
         at root: URL,
         selection: TestConfiguration.Selection,
         kind: Tests.Kind,
-        steps: SwiftBuildSteps = .init()
+        steps: SwiftBuildSteps? = nil
     ) async throws {
         let plan = try await Tests.resolve(at: root, selection: selection, kind: kind)
         var packages: [URL] = []
         for run in plan.runs where !packages.contains(run.package) {
             packages.append(run.package)
         }
-        try await SwiftBuildSteps.tidy(packages, clean: steps.cleanBefore, wipe: steps.wipeBefore)
+        if let steps {
+            try await SwiftBuildSteps.tidy(packages, clean: steps.cleanBefore, wipe: steps.wipeBefore)
+        }
         for run in plan.runs {
             print("\(run.package.appendingPathComponent("Package.swift").path): \(run.products.joined(separator: ", "))")
         }
         try await Tests.execute(plan)
-        try await SwiftBuildSteps.tidy(packages, clean: steps.clean, wipe: steps.wipe)
+        if let steps {
+            try await SwiftBuildSteps.tidyAfter(packages, clean: steps.clean, wipe: steps.wipe)
+        }
     }
 }
 

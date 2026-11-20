@@ -111,6 +111,15 @@ public enum PackageFrame {
         return file
     }
 
+    /// The `.wipe` policy of the package.frame in `directory`, whatever its kind; nil without one.
+    public static func wipe(in directory: URL) throws -> WipePolicy? {
+        guard let file = try BuildObjectDiscovery.local(named: fileName, in: directory) else { return nil }
+        switch try read(file) {
+        case .package(let package): return package.wipe
+        case .tests(let tests), .benchmarks(let tests): return tests.wipe
+        }
+    }
+
     /// The `package` binding beside a Package.swift, or nil when the directory has no package.frame.
     public static func package(in directory: URL) throws -> PackageConfiguration? {
         guard let file = try BuildObjectDiscovery.local(named: fileName, in: directory) else { return nil }
@@ -122,7 +131,8 @@ public enum PackageFrame {
         try source("package", ofType: "Package", PackageFields(
             build: package.buildArguments.isEmpty ? nil : .init(arguments: package.buildArguments),
             deploy: package.deployProducts.map { .init(products: $0) },
-            mode: package.mode
+            mode: package.mode,
+            wipe: package.wipe.map { .init(above: $0.above) }
         ))
     }
 
@@ -131,7 +141,8 @@ public enum PackageFrame {
             primary: tests.primary,
             groups: tests.groups.isEmpty ? nil : tests.groups,
             interactive: tests.interactive.isEmpty ? nil : tests.interactive,
-            mode: tests.mode
+            mode: tests.mode,
+            wipe: tests.wipe.map { .init(above: $0.above) }
         ))
     }
 
@@ -140,7 +151,8 @@ public enum PackageFrame {
             primary: benchmarks.primary,
             groups: benchmarks.groups.isEmpty ? nil : benchmarks.groups,
             interactive: benchmarks.interactive.isEmpty ? nil : benchmarks.interactive,
-            mode: benchmarks.mode
+            mode: benchmarks.mode,
+            wipe: benchmarks.wipe.map { .init(above: $0.above) }
         ))
     }
 
@@ -155,15 +167,18 @@ public enum PackageFrame {
         if let deploy = fields.deploy, deploy.products.isEmpty {
             throw PackageFrameError.empty_deploy
         }
-        return .init(buildArguments: fields.build?.arguments ?? [], deployProducts: fields.deploy?.products, mode: fields.mode)
+        return .init(buildArguments: fields.build?.arguments ?? [], deployProducts: fields.deploy?.products, mode: fields.mode,
+                     wipe: fields.wipe.map { .init(above: $0.above) })
     }
 
     private static func configuration(_ fields: TestsFields) -> TestConfiguration {
-        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode)
+        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode,
+              wipe: fields.wipe.map { .init(above: $0.above) })
     }
 
     private static func configuration(_ fields: BenchmarksFields) -> TestConfiguration {
-        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode)
+        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode,
+              wipe: fields.wipe.map { .init(above: $0.above) })
     }
 }
 
@@ -173,12 +188,14 @@ extension PackageFrame {
         let build: BuildFields?
         let deploy: DeployFields?
         let mode: BuildMode?
+        let wipe: WipeFields?
 
         static var frameSchema: Frame.Schema {
             .object([
                 .init("build", .of(BuildFields.self)),
                 .init("deploy", .of(DeployFields.self)),
                 .init("mode", .of(BuildMode.self), summary: "How a flagless `sbm build` builds: .release (default) or .debug."),
+                .init("wipe", .of(WipeFields.self)),
             ], summary: "How sbm builds and deploys the package beside this file: the `package` binding of package.frame.")
         }
     }
@@ -209,6 +226,7 @@ extension PackageFrame {
         let groups: [String: [String]]?
         let interactive: [String]?
         let mode: BuildMode?
+        let wipe: WipeFields?
 
         static var frameSchema: Frame.Schema {
             .object([
@@ -216,6 +234,7 @@ extension PackageFrame {
                 .init("groups", .init(.any, summary: "Named lists of test products: .{ .live = [\"t_name_live\"] }.")),
                 .init("interactive", .array(.string), summary: "Products that wait for input; `sbm test --all` skips them."),
                 .init("mode", .of(BuildMode.self), summary: "How the products build and run: .debug (default) or .release."),
+                .init("wipe", .of(WipeFields.self)),
             ], summary: "The test products of the test package beside this file: the `tests` binding of package.frame.")
         }
     }
@@ -225,6 +244,7 @@ extension PackageFrame {
         let groups: [String: [String]]?
         let interactive: [String]?
         let mode: BuildMode?
+        let wipe: WipeFields?
 
         static var frameSchema: Frame.Schema {
             .object([
@@ -232,7 +252,21 @@ extension PackageFrame {
                 .init("groups", .init(.any, summary: "Named lists of benchmark products: .{ .hazard = [\"b_name_hazard\"] }.")),
                 .init("interactive", .array(.string), summary: "Products that wait for input; `sbm bench --all` skips them."),
                 .init("mode", .of(BuildMode.self), summary: "How the products build and run: .release (default) or .debug."),
+                .init("wipe", .of(WipeFields.self)),
             ], summary: "The benchmark products of the benchmark package beside this file, built in release: the `benchmarks` binding of package.frame.")
+        }
+    }
+}
+
+extension PackageFrame {
+    struct WipeFields: Codable, Sendable, FrameDescribable {
+        let above: ByteCount
+
+        static var frameSchema: Frame.Schema {
+            .object([
+                .init("above", .string, required: true,
+                      summary: "A size like \"2G\" or \"500M\": after a successful run here, wipe .build and .index-build when together they exceed it."),
+            ], summary: "Wipe this package's caches after a successful build, test or bench run when they grow past a size (the keep list applies).")
         }
     }
 }

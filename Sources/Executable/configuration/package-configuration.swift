@@ -13,15 +13,19 @@ public struct PackageConfiguration: Sendable, Equatable {
     public let deployProducts: [String]?
     /// Release when nil.
     public let mode: BuildMode?
+    /// Wipe the caches after a build when they exceed a size.
+    public let wipe: WipePolicy?
 
     public init(
         buildArguments: [String] = [],
         deployProducts: [String]? = nil,
-        mode: BuildMode? = nil
+        mode: BuildMode? = nil,
+        wipe: WipePolicy? = nil
     ) {
         self.buildArguments = buildArguments
         self.deployProducts = deployProducts
         self.mode = mode
+        self.wipe = wipe
     }
 
     /// The flags a flagless `sbm build` runs with, or nil for a plain release build without deploy.

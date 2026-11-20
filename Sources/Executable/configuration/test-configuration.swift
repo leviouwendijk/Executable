@@ -9,17 +9,21 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     public let interactive: [String]
     /// Overrides the kind's default (tests debug, benchmarks release).
     public let mode: BuildMode?
+    /// Wipe the caches after a run when they exceed a size.
+    public let wipe: WipePolicy?
 
     public init(
         primary: String? = nil,
         groups: [String: [String]] = [:],
         interactive: [String] = [],
-        mode: BuildMode? = nil
+        mode: BuildMode? = nil,
+        wipe: WipePolicy? = nil
     ) {
         self.primary = primary
         self.groups = groups
         self.interactive = interactive
         self.mode = mode
+        self.wipe = wipe
     }
 
     public enum Selection: Sendable, Equatable {
