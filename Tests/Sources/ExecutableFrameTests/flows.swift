@@ -112,6 +112,32 @@ enum ExecutableFrameTests {
                              "build-object.pkl", "nearer Pkl wins over farther package.frame")
         }
 
+        Test("initialize writes package.frame and Tests/package.frame once, and refuses beside Pkl") {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("frame-init-\(UUID().uuidString)", isDirectory: true)
+            let tests = root.appendingPathComponent("Tests", isDirectory: true)
+            try FileManager.default.createDirectory(at: tests, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            try "// swift-tools-version: 6.2".write(to: tests.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+
+            let first = try PackageFrame.initialize(in: root)
+            try Expect.equal(first.package?.lastPathComponent, "package.frame", "package.frame is written")
+            try Expect.equal(first.tests?.deletingLastPathComponent().lastPathComponent, "Tests", "Tests/package.frame is written")
+            guard case .tests = try PackageFrame.read(tests.appendingPathComponent("package.frame")) else {
+                throw ExpectationError("Tests/package.frame declares tests")
+            }
+            let again = try PackageFrame.initialize(in: root)
+            try Expect.isNil(again.package, "existing package.frame is kept")
+            try Expect.isNil(again.tests, "existing Tests/package.frame is kept")
+
+            let legacy = root.appendingPathComponent("legacy", isDirectory: true)
+            try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+            try "name = \"Legacy\"".write(to: legacy.appendingPathComponent("build-object.pkl"), atomically: true, encoding: .utf8)
+            try Expect.throwsError("no package.frame beside build-object.pkl") {
+                _ = try PackageFrame.initialize(in: legacy)
+            }
+        }
+
         Test("the Executable module file describes package.frame on its own") {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("executable-modules-\(UUID().uuidString)", isDirectory: true)

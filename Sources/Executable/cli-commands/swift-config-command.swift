@@ -37,32 +37,12 @@ public enum SwiftConfigInitCommand: RunnableArgumentCommand {
             isDirectory: true
         ).standardizedFileURL
 
-        if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
-           try BuildObjectDiscovery.local(named: PackageFrame.fileName, in: project) == nil {
-            throw ConfigurationFileError.legacy(legacy)
+        let initialized = try PackageFrame.initialize(in: project)
+        for file in [initialized.package, initialized.tests].compactMap({ $0 }) {
+            print("Created \(file.path)")
         }
-
-        try write(PackageFrame.source(PackageConfiguration()), in: project)
-
-        let tests = project.appendingPathComponent(Tests.conventionalDirectory, isDirectory: true)
-        if try BuildObjectDiscovery.local(named: "Package.swift", in: tests) != nil {
-            try write(PackageFrame.source(TestConfiguration()), in: tests)
+        if initialized.package == nil {
+            print("\(project.appendingPathComponent(PackageFrame.fileName).path) already exists")
         }
-    }
-}
-
-private extension SwiftConfigInitCommand {
-    static func write(
-        _ source: String,
-        in directory: URL
-    ) throws {
-        let file = directory.appendingPathComponent(PackageFrame.fileName)
-        if try BuildObjectDiscovery.local(named: PackageFrame.fileName, in: directory) != nil {
-            print("\(file.path) already exists")
-            return
-        }
-        try BuildObjectDiscovery.requireOwned(file, by: directory)
-        try BuildObjectFile.write(source, to: file)
-        print("Created \(file.path)")
     }
 }

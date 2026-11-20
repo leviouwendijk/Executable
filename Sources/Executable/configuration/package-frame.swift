@@ -66,6 +66,37 @@ public enum PackageFrame {
         try BuildObjectFile.read(from: url, decoding: parse)
     }
 
+    /// What `initialize(in:)` wrote; nil where a package.frame already existed or nothing applies.
+    public struct Initialized: Sendable, Equatable {
+        public let package: URL?
+        public let tests: URL?
+    }
+
+    /// Writes `let package: Package = .{};` beside the project's Package.swift, and
+    /// `let tests: Tests = .{};` in `Tests/` when it holds a Package.swift. Existing files are
+    /// kept; a legacy build-object.pkl is refused.
+    public static func initialize(in project: URL) throws -> Initialized {
+        let project = project.standardizedFileURL
+        if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
+           try BuildObjectDiscovery.local(named: fileName, in: project) == nil {
+            throw ConfigurationFileError.legacy(legacy)
+        }
+        let package = try create(source(PackageConfiguration()), in: project)
+        let tests = project.appendingPathComponent(Tests.conventionalDirectory, isDirectory: true)
+        guard try BuildObjectDiscovery.local(named: "Package.swift", in: tests) != nil else {
+            return .init(package: package, tests: nil)
+        }
+        return .init(package: package, tests: try create(source(TestConfiguration()), in: tests))
+    }
+
+    private static func create(_ source: String, in directory: URL) throws -> URL? {
+        guard try BuildObjectDiscovery.local(named: fileName, in: directory) == nil else { return nil }
+        let file = directory.appendingPathComponent(fileName)
+        try BuildObjectDiscovery.requireOwned(file, by: directory)
+        try BuildObjectFile.write(source, to: file)
+        return file
+    }
+
     /// The `package` binding beside a Package.swift, or nil when the directory has no package.frame.
     public static func package(in directory: URL) throws -> PackageConfiguration? {
         guard let file = try BuildObjectDiscovery.local(named: fileName, in: directory) else { return nil }
