@@ -1,5 +1,6 @@
 import Executable
 import Foundation
+import Path
 import Version
 
 /// Moves a build-object.pkl project to package.frame:
@@ -102,6 +103,29 @@ public enum PackageFrameMigration {
         )
     }
 
+    /// Projects to migrate under each root: the root itself when it holds a build-object.pkl,
+    /// and every directory within `depth` levels below it that does. Hidden directories
+    /// (`.build`, `.git`) are not entered.
+    public static func discover(in roots: [URL], depth: Int) throws -> [URL] {
+        var projects: [URL] = []
+        for root in roots.map(\.standardizedFileURL) {
+            if try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: root) != nil {
+                projects.append(root)
+            }
+            let entries = try PathWalker(
+                root: root,
+                configuration: .init(maxDepth: depth + 1, emitDirectories: false)
+            ).walk()
+            projects += entries
+                .filter { $0.url.lastPathComponent == BuildObjectDiscovery.legacyConfiguration }
+                .map { $0.url.deletingLastPathComponent().standardizedFileURL }
+        }
+        var seen = Set<String>()
+        return projects
+            .filter { seen.insert($0.path).inserted }
+            .sorted { $0.path < $1.path }
+    }
+
     /// `compile { use arguments }` as `.build` and `.deploy`. `--products` and `--targets`
     /// name what is deployed (targets mapped to the executable products that build them);
     /// `-l`/`--no-move` keep the build local, so nothing is deployed; other flags stay
@@ -170,7 +194,8 @@ public enum PackageFrameMigration {
         do {
             try await ReleaseTags.create(version, at: project)
             return .tagged(version)
-        } catch let error as ReleaseTags.TagError {
+        } catch {
+            // Dirty, unpushed, already released, or no upstream: migrate anyway, tag by hand later.
             return .skipped(version, reason: error.localizedDescription)
         }
     }

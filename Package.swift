@@ -84,6 +84,7 @@ let package = Package(
             name: "ExecutableLegacy",
             dependencies: [
                 "Executable",
+                .product(name: "Path", package: "Path"),
                 .product(name: "plate", package: "plate"),
                 .product(name: "Interfaces", package: "Interfaces"),
                 .product(name: "Version", package: "Version"),

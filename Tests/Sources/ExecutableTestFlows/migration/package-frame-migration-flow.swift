@@ -75,6 +75,37 @@ extension ExecutableFlowSuite {
                 try Expect.isNil(result.testsFrame, "no Tests/package.frame without a Tests/ package")
             }
 
+            Step("discovery finds projects within depth under each root, never in hidden directories") {
+                let root = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("modernize-discover-\(UUID().uuidString)", isDirectory: true)
+                defer { try? FileManager.default.removeItem(at: root) }
+                let layout = [
+                    "libs/Alpha",
+                    "libs/Beta",
+                    "api/swift/service/Gamma",
+                    "api/swift/service/deep/Delta",
+                    "libs/Alpha/.build/checkouts/Hidden",
+                    "single",
+                ]
+                for path in layout {
+                    let directory = root.appendingPathComponent(path, isDirectory: true)
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    try "name = \"x\"".write(to: directory.appendingPathComponent("build-object.pkl"), atomically: true, encoding: .utf8)
+                }
+
+                let libs = try PackageFrameMigration.discover(in: [root.appendingPathComponent("libs")], depth: 1)
+                try Expect.equal(libs.map(\.lastPathComponent), ["Alpha", "Beta"], "direct children; .build is not entered")
+
+                let api = try PackageFrameMigration.discover(in: [root.appendingPathComponent("api/swift")], depth: 2)
+                try Expect.equal(api.map(\.lastPathComponent), ["Gamma"], "two levels down, not three")
+
+                let both = try PackageFrameMigration.discover(
+                    in: [root.appendingPathComponent("single"), root.appendingPathComponent("libs"), root.appendingPathComponent("libs")],
+                    depth: 1
+                )
+                try Expect.equal(both.map(\.lastPathComponent), ["Alpha", "Beta", "single"], "a project root counts itself; duplicates collapse")
+            }
+
             Step("local builds stay local and a project without compile deploys nothing") {
                 let local = try await MigrationFixture(
                     compile: #"use = true arguments { "--debug" "--local" "--products" "fixture-cli" }"#,
