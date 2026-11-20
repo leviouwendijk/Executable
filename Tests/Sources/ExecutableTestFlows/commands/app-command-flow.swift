@@ -27,6 +27,7 @@ extension ExecutableFlowSuite {
                         "x",
                         "build",
                         "test",
+                        "bench",
                         "wf",
                         "pkg",
                         "docs",

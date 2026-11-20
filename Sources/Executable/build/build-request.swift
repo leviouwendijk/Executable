@@ -94,11 +94,8 @@ public extension Build {
         }
     }
 
+    /// `.deploy` from .config/sbm/settings.frame, or ~/sbm-bin.
     static var defaultDeploymentDirectory: URL {
-        PathAnchor.home.directory_url
-            .appendingPathComponent(
-                "sbm-bin",
-                isDirectory: true
-            )
+        SbmSettings.resolved.deploymentDirectory
     }
 }

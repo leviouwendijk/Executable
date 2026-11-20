@@ -23,7 +23,7 @@ public enum SwiftConfigInitCommand: RunnableArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Write package.frame for the current directory, and Tests/package.frame when Tests/Package.swift exists"
+                "Write package.frame for the current directory, and Tests/ and Benchmarks/ package.frame files where those packages exist"
             ),
         ]
     }
@@ -38,7 +38,7 @@ public enum SwiftConfigInitCommand: RunnableArgumentCommand {
         ).standardizedFileURL
 
         let initialized = try PackageFrame.initialize(in: project)
-        for file in [initialized.package, initialized.tests].compactMap({ $0 }) {
+        for file in [initialized.package, initialized.tests, initialized.benchmarks].compactMap({ $0 }) {
             print("Created \(file.path)")
         }
         if initialized.package == nil {

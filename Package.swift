@@ -75,6 +75,7 @@ let package = Package(
                 .product(name: "Version", package: "Version"),
                 .product(name: "Parsers", package: "Parsers"),
                 .product(name: "Frame", package: "Frame"),
+                .product(name: "Roots", package: "Frame"),
                 .product(name: "IO", package: "IO"),
                 .product(name: "Readers", package: "Readers"),
                 .product(name: "Arguments", package: "Arguments"),

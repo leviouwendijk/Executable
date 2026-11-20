@@ -124,6 +124,44 @@ extension SwiftPackageFixture {
     }
 }
 
+extension SwiftPackageFixture {
+    /// A nested `Benchmarks/` package with one product, `b_fixture`, depending on the fixture by path.
+    func writeBenchmarkPackage() throws {
+        let parent = root.lastPathComponent
+        try write(
+            """
+            // swift-tools-version: 6.2
+
+            import PackageDescription
+
+            let package = Package(
+                name: "ExecutableFixtureBenchmarks",
+                products: [
+                    .executable(name: "b_fixture", targets: ["FixtureBenchmark"]),
+                ],
+                dependencies: [.package(path: "..")],
+                targets: [
+                    .executableTarget(
+                        name: "FixtureBenchmark",
+                        dependencies: [.product(name: "FixtureCore", package: "\(parent)")]
+                    ),
+                ]
+            )
+            """,
+            to: "Benchmarks/Package.swift"
+        )
+        try write(
+            """
+            import FixtureCore
+
+            print("benchmark-\\(fixtureValue())")
+            """,
+            to: "Benchmarks/Sources/FixtureBenchmark/main.swift"
+        )
+        try write("import Executable;\n\nlet benchmarks: Benchmarks = .{};\n", to: "Benchmarks/package.frame")
+    }
+}
+
 private extension SwiftPackageFixture {
     func writePackage() throws {
         try write(

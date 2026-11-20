@@ -32,6 +32,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Executable", package: "Executable"),
                 .product(name: "Frame", package: "Frame"),
+                .product(name: "Roots", package: "Frame"),
                 .product(name: "Testing", package: "Testing"),
             ]
         ),

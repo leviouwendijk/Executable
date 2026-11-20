@@ -26,6 +26,8 @@ public enum ExecutableFrame {
     public static let module = Frame.Module("Executable", types: [
         .decodable(PackageFrame.PackageFields.self, named: "Package"),
         .decodable(PackageFrame.TestsFields.self, named: "Tests"),
+        .decodable(PackageFrame.BenchmarksFields.self, named: "Benchmarks"),
+        .decodable(SbmSettings.Fields.self, named: "Settings"),
     ])
 
     public static let environment = Frame.Environment([module])
@@ -44,20 +46,23 @@ public enum PackageFrame {
     public enum Description: Sendable, Equatable {
         case package(PackageConfiguration)
         case tests(TestConfiguration)
+        case benchmarks(TestConfiguration)
     }
 
     public static func parse(_ source: String) throws -> Description {
         let document = try Frame.parse(source, environment: ExecutableFrame.environment)
-        let package = document.binding(named: "package")?.type?.components.last == "Package"
-        let tests = document.binding(named: "tests")?.type?.components.last == "Tests"
-        switch (package, tests) {
-        case (true, true):
-            throw PackageFrameError.both_bindings
-        case (true, false):
+        let declared = [
+            ("package", "Package"), ("tests", "Tests"), ("benchmarks", "Benchmarks"),
+        ].filter { name, type in document.binding(named: name)?.type?.components.last == type }
+        guard declared.count <= 1 else { throw PackageFrameError.both_bindings }
+        switch declared.first?.0 {
+        case "package":
             return .package(try configuration(document.decode(PackageFields.self, binding: "package")))
-        case (false, true):
+        case "tests":
             return .tests(configuration(try document.decode(TestsFields.self, binding: "tests")))
-        case (false, false):
+        case "benchmarks":
+            return .benchmarks(configuration(try document.decode(BenchmarksFields.self, binding: "benchmarks")))
+        default:
             throw PackageFrameError.missing_binding
         }
     }
@@ -70,11 +75,13 @@ public enum PackageFrame {
     public struct Initialized: Sendable, Equatable {
         public let package: URL?
         public let tests: URL?
+        public let benchmarks: URL?
     }
 
     /// Writes `let package: Package = .{};` beside the project's Package.swift, and
-    /// `let tests: Tests = .{};` in `Tests/` when it holds a Package.swift. Existing files are
-    /// kept; a legacy build-object.pkl is refused.
+    /// `let tests: Tests = .{};` / `let benchmarks: Benchmarks = .{};` in `Tests/` and
+    /// `Benchmarks/` when they hold a Package.swift. Existing files are kept; a legacy
+    /// build-object.pkl is refused.
     public static func initialize(in project: URL) throws -> Initialized {
         let project = project.standardizedFileURL
         if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
@@ -82,11 +89,17 @@ public enum PackageFrame {
             throw ConfigurationFileError.legacy(legacy)
         }
         let package = try create(source(PackageConfiguration()), in: project)
-        let tests = project.appendingPathComponent(Tests.conventionalDirectory, isDirectory: true)
-        guard try BuildObjectDiscovery.local(named: "Package.swift", in: tests) != nil else {
-            return .init(package: package, tests: nil)
+        let layout = PackageLayout()
+        func nested(_ part: PackageLayout.Nested, _ source: String) throws -> URL? {
+            let directory = PackageLayout.url(part.root, in: project)
+            guard try BuildObjectDiscovery.local(named: "Package.swift", in: directory) != nil else { return nil }
+            return try create(source, in: directory)
         }
-        return .init(package: package, tests: try create(source(TestConfiguration()), in: tests))
+        return .init(
+            package: package,
+            tests: try nested(layout.tests, source(TestConfiguration())),
+            benchmarks: try nested(layout.benchmarks, source(benchmarks: TestConfiguration()))
+        )
     }
 
     private static func create(_ source: String, in directory: URL) throws -> URL? {
@@ -107,7 +120,8 @@ public enum PackageFrame {
     public static func source(_ package: PackageConfiguration) throws -> String {
         try source("package", ofType: "Package", PackageFields(
             build: package.buildArguments.isEmpty ? nil : .init(arguments: package.buildArguments),
-            deploy: package.deployProducts.map { .init(products: $0) }
+            deploy: package.deployProducts.map { .init(products: $0) },
+            mode: package.mode
         ))
     }
 
@@ -115,7 +129,17 @@ public enum PackageFrame {
         try source("tests", ofType: "Tests", TestsFields(
             primary: tests.primary,
             groups: tests.groups.isEmpty ? nil : tests.groups,
-            interactive: tests.interactive.isEmpty ? nil : tests.interactive
+            interactive: tests.interactive.isEmpty ? nil : tests.interactive,
+            mode: tests.mode
+        ))
+    }
+
+    public static func source(benchmarks: TestConfiguration) throws -> String {
+        try source("benchmarks", ofType: "Benchmarks", BenchmarksFields(
+            primary: benchmarks.primary,
+            groups: benchmarks.groups.isEmpty ? nil : benchmarks.groups,
+            interactive: benchmarks.interactive.isEmpty ? nil : benchmarks.interactive,
+            mode: benchmarks.mode
         ))
     }
 
@@ -130,11 +154,15 @@ public enum PackageFrame {
         if let deploy = fields.deploy, deploy.products.isEmpty {
             throw PackageFrameError.empty_deploy
         }
-        return .init(buildArguments: fields.build?.arguments ?? [], deployProducts: fields.deploy?.products)
+        return .init(buildArguments: fields.build?.arguments ?? [], deployProducts: fields.deploy?.products, mode: fields.mode)
     }
 
     private static func configuration(_ fields: TestsFields) -> TestConfiguration {
-        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [])
+        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode)
+    }
+
+    private static func configuration(_ fields: BenchmarksFields) -> TestConfiguration {
+        .init(primary: fields.primary, groups: fields.groups ?? [:], interactive: fields.interactive ?? [], mode: fields.mode)
     }
 }
 
@@ -143,11 +171,13 @@ extension PackageFrame {
     struct PackageFields: Codable, Sendable, FrameDescribable {
         let build: BuildFields?
         let deploy: DeployFields?
+        let mode: BuildMode?
 
         static var frameSchema: Frame.Schema {
             .object([
                 .init("build", .of(BuildFields.self)),
                 .init("deploy", .of(DeployFields.self)),
+                .init("mode", .of(BuildMode.self), summary: "How a flagless `sbm build` builds: .release (default) or .debug."),
             ], summary: "How sbm builds and deploys the package beside this file: the `package` binding of package.frame.")
         }
     }
@@ -177,13 +207,31 @@ extension PackageFrame {
         let primary: String?
         let groups: [String: [String]]?
         let interactive: [String]?
+        let mode: BuildMode?
 
         static var frameSchema: Frame.Schema {
             .object([
                 .init("primary", .string, summary: "The product `sbm test` runs by default; optional when the package has one product."),
                 .init("groups", .init(.any, summary: "Named lists of test products: .{ .live = [\"t_name_live\"] }.")),
                 .init("interactive", .array(.string), summary: "Products that wait for input; `sbm test --all` skips them."),
+                .init("mode", .of(BuildMode.self), summary: "How the products build and run: .debug (default) or .release."),
             ], summary: "The test products of the test package beside this file: the `tests` binding of package.frame.")
+        }
+    }
+
+    struct BenchmarksFields: Codable, Sendable, FrameDescribable {
+        let primary: String?
+        let groups: [String: [String]]?
+        let interactive: [String]?
+        let mode: BuildMode?
+
+        static var frameSchema: Frame.Schema {
+            .object([
+                .init("primary", .string, summary: "The product `sbm bench` runs by default; optional when the package has one product."),
+                .init("groups", .init(.any, summary: "Named lists of benchmark products: .{ .hazard = [\"b_name_hazard\"] }.")),
+                .init("interactive", .array(.string), summary: "Products that wait for input; `sbm bench --all` skips them."),
+                .init("mode", .of(BuildMode.self), summary: "How the products build and run: .release (default) or .debug."),
+            ], summary: "The benchmark products of the benchmark package beside this file, built in release: the `benchmarks` binding of package.frame.")
         }
     }
 }
@@ -197,8 +245,8 @@ public enum PackageFrameError: Error, Sendable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .missing_binding: return "package.frame must declare `let package: Package` or `let tests: Tests`."
-        case .both_bindings: return "package.frame declares both `package` and `tests`; a package is one or the other."
+        case .missing_binding: return "package.frame must declare `let package: Package`, `let tests: Tests` or `let benchmarks: Benchmarks`."
+        case .both_bindings: return "package.frame declares more than one of `package`, `tests` and `benchmarks`; a package is one of them."
         case .empty_deploy: return "package.frame .deploy.products must name at least one product."
         case .not_a_package(let url): return "\(url.path) describes a test package, not a package to build."
         case .not_tests(let url): return "\(url.path) describes a package to build, not a test package."

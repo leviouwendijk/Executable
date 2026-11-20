@@ -1,6 +1,7 @@
 import Foundation
 import Executable
 import Frame
+import Roots
 import Testing
 
 enum ExecutableFrameTests {
@@ -63,6 +64,71 @@ enum ExecutableFrameTests {
                 throw ExpectationError("an empty test package is a test package")
             }
             try Expect.isNil(empty.primary, "primary is optional")
+        }
+
+        Test("a benchmark package declares its products like a test package") {
+            let source = "import Executable;\n\nlet benchmarks: Benchmarks = .{ .primary = \"b_io_fs\", .groups = .{ .hazard = [\"b_io_hazard\"] } };\n"
+            guard case .benchmarks(let configuration) = try PackageFrame.parse(source) else {
+                throw ExpectationError("benchmarks declares a benchmark package")
+            }
+            try Expect.equal(configuration.primary, "b_io_fs", "primary")
+            try Expect.equal(configuration.groups["hazard"], ["b_io_hazard"], "groups")
+            try Expect.equal(
+                try PackageFrame.parse(PackageFrame.source(benchmarks: configuration)), .benchmarks(configuration),
+                "benchmark package round-trips"
+            )
+            try Expect.throwsError("tests and benchmarks in one file") {
+                _ = try PackageFrame.parse(source + "let tests: Tests = .{};\n")
+            }
+        }
+
+        Test("mode: packages build in release unless .debug; test packages may override their default") {
+            guard case .package(let debug) = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .mode = .debug };\n") else {
+                throw ExpectationError("a package with a mode")
+            }
+            try Expect.equal(debug.flaglessArguments, ["--debug", "--no-move"], ".debug builds locally in debug")
+            guard case .package(let deployed) = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .mode = .debug, .deploy = .{ .products = [\"gm\"] } };\n") else {
+                throw ExpectationError("a deployed package with a mode")
+            }
+            try Expect.equal(deployed.flaglessArguments, ["--debug", "--products", "gm"], ".debug still deploys what .deploy names")
+            guard case .package(let plain) = try PackageFrame.parse(library) else {
+                throw ExpectationError("library")
+            }
+            try Expect.isNil(plain.mode, "release is the default, so nothing is written")
+
+            guard case .tests(let tests) = try PackageFrame.parse("import Executable;\n\nlet tests: Tests = .{ .mode = .release };\n") else {
+                throw ExpectationError("tests with a mode")
+            }
+            try Expect.equal(tests.mode, .release, "a test package may build in release")
+            try Expect.equal(try PackageFrame.parse(PackageFrame.source(tests)), .tests(tests), "mode round-trips")
+            try Expect.throwsError("an unknown mode") {
+                _ = try PackageFrame.parse("import Executable;\n\nlet tests: Tests = .{ .mode = .fast };\n")
+            }
+        }
+
+        Test("settings.frame sets where sbm deploys; without it, ~/sbm-bin") {
+            let home = FileManager.default.temporaryDirectory
+                .appendingPathComponent("sbm-settings-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: home) }
+            let roots = Roots.load(file: home.appendingPathComponent(".config/roots.frame"), home: home)
+
+            let none = try SbmSettings.load(roots: roots)
+            try Expect.isNil(none.deploy, "no settings file means the default")
+            try Expect.equal(none.deploymentDirectory, SbmSettings.expand("~/sbm-bin"), "the default is ~/sbm-bin")
+
+            let directory = home.appendingPathComponent(".config/sbm", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try "import Executable;\n\nlet settings: Settings = .{ .deploy = \"/opt/sbm-bin\" };\n"
+                .write(to: directory.appendingPathComponent("settings.frame"), atomically: true, encoding: .utf8)
+            let set = try SbmSettings.load(roots: roots)
+            try Expect.equal(set.deploy, "/opt/sbm-bin", "the file's .deploy is used")
+            try Expect.equal(set.deploymentDirectory.path, "/opt/sbm-bin", "absolute paths are kept")
+
+            try Expect.equal(SbmSettings.expand("~/bin", home: home).path, home.appendingPathComponent("bin").path, "~ is the home directory")
+            try Expect.equal(SbmSettings.expand("bin", home: home).path, home.appendingPathComponent("bin").path, "relative paths are relative to home")
+            try Expect.throwsError("a settings file without its binding") {
+                _ = try SbmSettings.parse("import Executable;\n\nlet package: Package = .{};\n")
+            }
         }
 
         Test("written package.frame reads back the same") {

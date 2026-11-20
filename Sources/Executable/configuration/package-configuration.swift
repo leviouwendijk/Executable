@@ -11,21 +11,26 @@ public struct PackageConfiguration: Sendable, Equatable {
     public let buildArguments: [String]
     /// Executable products a flagless `sbm build` builds and deploys; nil without a `.deploy` clause.
     public let deployProducts: [String]?
+    /// Release when nil.
+    public let mode: BuildMode?
 
     public init(
         buildArguments: [String] = [],
-        deployProducts: [String]? = nil
+        deployProducts: [String]? = nil,
+        mode: BuildMode? = nil
     ) {
         self.buildArguments = buildArguments
         self.deployProducts = deployProducts
+        self.mode = mode
     }
 
     /// The flags a flagless `sbm build` runs with, or nil for a plain release build without deploy.
     public var flaglessArguments: [String]? {
+        let arguments = (mode == .debug ? ["--debug"] : []) + buildArguments
         if let deployProducts {
-            return buildArguments + ["--products"] + deployProducts
+            return arguments + ["--products"] + deployProducts
         }
-        guard !buildArguments.isEmpty else { return nil }
-        return buildArguments + ["--no-move"]
+        guard !arguments.isEmpty else { return nil }
+        return arguments + ["--no-move"]
     }
 }

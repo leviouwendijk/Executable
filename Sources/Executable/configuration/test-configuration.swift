@@ -7,15 +7,19 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
     public let groups: [String: [String]]
     /// Products that wait for input; never run by `.all`.
     public let interactive: [String]
+    /// Overrides the kind's default (tests debug, benchmarks release).
+    public let mode: BuildMode?
 
     public init(
         primary: String? = nil,
         groups: [String: [String]] = [:],
-        interactive: [String] = []
+        interactive: [String] = [],
+        mode: BuildMode? = nil
     ) {
         self.primary = primary
         self.groups = groups
         self.interactive = interactive
+        self.mode = mode
     }
 
     public enum Selection: Sendable, Equatable {

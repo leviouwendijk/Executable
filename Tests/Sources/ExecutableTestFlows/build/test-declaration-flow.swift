@@ -121,6 +121,31 @@ extension ExecutableFlowSuite {
                 try Expect.equal(inside.products, ["t_fixture"], "resolving from inside the test package finds the same product")
             }
 
+            Step("benchmarks are their own package kind: sbm bench finds them in release, sbm test never") {
+                let fixture = try SwiftPackageFixture()
+                defer { fixture.remove() }
+                try "import Executable;\n\nlet package: Package = .{};\n".write(
+                    to: fixture.root.appendingPathComponent("package.frame"),
+                    atomically: true,
+                    encoding: .utf8
+                )
+                try fixture.writeTestPackage()
+                try fixture.writeBenchmarkPackage()
+
+                let tests = try await Tests.resolve(at: fixture.root, selection: .all)
+                try Expect.equal(tests.runs.map(\.package.lastPathComponent), ["Tests"], "tests never include the benchmark package")
+                try Expect.equal(tests.runs.map(\.mode), [.debug], "tests run in debug")
+
+                let benchmarks = try await Tests.resolve(at: fixture.root, kind: .benchmarks)
+                try Expect.equal(benchmarks.runs.map(\.package.lastPathComponent), ["Benchmarks"], "benchmarks resolve to Benchmarks/")
+                try Expect.equal(benchmarks.products, ["b_fixture"], "the only benchmark product is the primary")
+                try Expect.equal(benchmarks.runs.map(\.mode), [.release], "benchmarks run in release")
+                try await Tests.execute(benchmarks)
+
+                let inside = try await Tests.resolve(at: fixture.root.appendingPathComponent("Benchmarks"), kind: .benchmarks)
+                try Expect.equal(inside.products, ["b_fixture"], "resolving from inside Benchmarks/ finds the same product")
+            }
+
             Step("test package reaching its parent through another dependency is refused") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }

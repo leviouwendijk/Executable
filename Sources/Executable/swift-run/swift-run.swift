@@ -8,13 +8,16 @@ public enum SwiftRun {
     {
         public let product: String
         public let arguments: [String]
+        public let mode: Build.Config.Mode
 
         public init(
             product: String,
-            arguments: [String] = []
+            arguments: [String] = [],
+            mode: Build.Config.Mode = .debug
         ) {
             self.product = product
             self.arguments = arguments
+            self.mode = mode
         }
     }
 
@@ -107,6 +110,7 @@ public enum SwiftRun {
                 arguments: [
                     "swift",
                     "run",
+                ] + (request.mode == .release ? ["-c", "release"] : []) + [
                     request.product,
                 ] + request.arguments,
                 workingDirectory: packageDirectory,
