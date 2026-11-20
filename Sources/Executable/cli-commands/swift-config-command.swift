@@ -39,8 +39,7 @@ public enum SwiftConfigInitCommand: RunnableArgumentCommand {
 
         if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
            try BuildObjectDiscovery.local(named: PackageFrame.fileName, in: project) == nil {
-            print("\(legacy.path) is legacy; migrate it to package.frame instead of writing a new one.")
-            return
+            throw ConfigurationFileError.legacy(legacy)
         }
 
         try write(PackageFrame.source(PackageConfiguration()), in: project)

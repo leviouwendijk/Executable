@@ -26,6 +26,10 @@ extension ExecutableFlowSuite {
                         "app",
                         "x",
                         "build",
+                        "test",
+                        "wf",
+                        "pkg",
+                        "docs",
                         "lib",
                         "renew-repositories",
                         "kill-swiftpm",
@@ -37,9 +41,8 @@ extension ExecutableFlowSuite {
                         "config",
                         "increment",
                         "update",
-                        "modernize",
                         "version",
-                        "remote",
+                        "frame-module",
                     ],
                     "native sbm command inventory matches the legacy root"
                 )

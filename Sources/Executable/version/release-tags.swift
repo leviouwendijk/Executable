@@ -55,19 +55,29 @@ public enum ReleaseTags {
         at directory: URL,
         push: Bool = true
     ) async throws -> (from: ObjectVersion?, to: ObjectVersion) {
+        let from = try await latest(at: directory)
+        var to = from ?? .zero()
+        to.increment(level)
+        try await create(to, at: directory, push: push)
+        return (from, to)
+    }
+
+    /// Tags HEAD with `version` and pushes the tag to the upstream remote. Refuses a dirty or
+    /// unpushed HEAD, a HEAD that is already released, and a version tagged before.
+    public static func create(
+        _ version: ObjectVersion,
+        at directory: URL,
+        push: Bool = true
+    ) async throws {
         guard try await !GitRepo.isDirty(directory) else { throw TagError.dirty(directory) }
         let divergence = try await GitRepo.divergence(directory)
         guard divergence.ahead == 0 else { throw TagError.unpushed(directory, ahead: divergence.ahead) }
 
-        if let released = try await tags(at: directory, ["tag", "--points-at", "HEAD"]).first(where: { version(of: $0) != nil }) {
+        if let released = try await tags(at: directory, ["tag", "--points-at", "HEAD"]).first(where: { self.version(of: $0) != nil }) {
             throw TagError.alreadyReleased(released)
         }
 
-        let from = try await latest(at: directory)
-        var to = from ?? .zero()
-        to.increment(level)
-        let tag = name(for: to)
-
+        let tag = name(for: version)
         let existing = Set(try await tags(at: directory, ["tag", "--list"]))
         guard !existing.contains(tag), !existing.contains("v" + tag) else { throw TagError.exists(tag) }
 
@@ -76,7 +86,6 @@ public enum ReleaseTags {
             let (remote, _) = try await GitRepo.upstream(directory)
             _ = try await GitRepo.gitOut(directory, ["push", remote, tag])
         }
-        return (from, to)
     }
 
     private static func tags(at directory: URL, _ arguments: [String]) async throws -> [String] {

@@ -1,4 +1,5 @@
 import Executable
+import ExecutableLegacy
 import Foundation
 import TestFlows
 
@@ -68,7 +69,7 @@ extension ExecutableFlowSuite {
                 }
             }
 
-            Step("fixture resolves and runs its declared executable test product") {
+            Step("tests declared only in a legacy build-object.pkl point at sbm modernize") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
                 try sampleTestBuildObject().write(
@@ -76,16 +77,19 @@ extension ExecutableFlowSuite {
                     atomically: true,
                     encoding: .utf8
                 )
-                let plan = try await Tests.resolve(at: fixture.root)
-                try Expect.equal(plan.products, ["fixture-cli"], "legacy root tests { } resolve the declared product")
-                try await Tests.execute(plan)
+                do {
+                    _ = try await Tests.resolve(at: fixture.root)
+                    try Expect.false(true, "legacy tests { } must not be run by core")
+                } catch ConfigurationFileError.legacy {
+                    try Expect.true(true, "legacy tests point at sbm modernize")
+                }
             }
 
             Step("nested test package runs its only product without a tests declaration") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
-                try sampleTestBuildObject(tests: false).write(
-                    to: fixture.root.appendingPathComponent("build-object.pkl"),
+                try "import Executable;\n\nlet package: Package = .{};\n".write(
+                    to: fixture.root.appendingPathComponent("package.frame"),
                     atomically: true,
                     encoding: .utf8
                 )
@@ -102,8 +106,8 @@ extension ExecutableFlowSuite {
             Step("test package reaching its parent through another dependency is refused") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
-                try sampleTestBuildObject(tests: false).write(
-                    to: fixture.root.appendingPathComponent("build-object.pkl"),
+                try "import Executable;\n\nlet package: Package = .{};\n".write(
+                    to: fixture.root.appendingPathComponent("package.frame"),
                     atomically: true,
                     encoding: .utf8
                 )
@@ -119,17 +123,8 @@ extension ExecutableFlowSuite {
     }
 }
 
-private func sampleTestBuildObject(tests: Bool = true) -> String {
-    let declaration = tests ? """
-
-    tests {
-        primary = "fixture-cli"
-        groups {
-            smoke { "fixture-cli" }
-        }
-    }
-    """ : ""
-    return """
+private func sampleTestBuildObject() -> String {
+    """
     uuid = "00000000-0000-0000-0000-000000000001"
     name = "ExecutableFixture"
     types { "binary" }
@@ -143,7 +138,13 @@ private func sampleTestBuildObject(tests: Bool = true) -> String {
     compile {
         use = false
         arguments { }
-    }\(declaration)
+    }
+    tests {
+        primary = "fixture-cli"
+        groups {
+            smoke { "fixture-cli" }
+        }
+    }
     details = ""
     author = ""
     update = ""

@@ -112,23 +112,6 @@ enum ExecutableFrameTests {
                              "build-object.pkl", "nearer Pkl wins over farther package.frame")
         }
 
-        Test("legacy initialization writes Pkl and refuses beside package.frame") {
-            let root = FileManager.default.temporaryDirectory
-                .appendingPathComponent("frame-init-\(UUID().uuidString)", isDirectory: true)
-            let legacy = root.appendingPathComponent("legacy", isDirectory: true)
-            let modern = root.appendingPathComponent("modern", isDirectory: true)
-            try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-            try FileManager.default.createDirectory(at: modern, withIntermediateDirectories: true)
-            defer { try? FileManager.default.removeItem(at: root) }
-            let created = try BuildObjectLifecycle.initializeEmpty(at: legacy)
-            try Expect.equal(created.configurationURL.lastPathComponent, "build-object.pkl", "legacy configuration")
-            try Expect.equal(created.compiledURL.lastPathComponent, "compiled.pkl", "legacy sidecar")
-            try library.write(to: modern.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
-            try Expect.throwsError("no build-object.pkl beside package.frame") {
-                _ = try BuildObjectLifecycle.initializeEmpty(at: modern)
-            }
-        }
-
         Test("the Executable module file describes package.frame on its own") {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("executable-modules-\(UUID().uuidString)", isDirectory: true)

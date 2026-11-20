@@ -27,7 +27,7 @@ public struct LiveWorkflowOperationPerformer: WorkflowOperationPerforming {
     public func build(at directory: URL, configuration: Build.Config.Mode) async throws {
         let result = try await Build.captured(
             at: directory,
-            config: .init(mode: configuration, updateBuiltOnSuccess: false)
+            config: .init(mode: configuration)
         )
         if !result.stdout.isEmpty {
             await on_output?(.combined(String(decoding: result.stdout, as: UTF8.self)))

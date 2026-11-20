@@ -23,8 +23,7 @@ extension ExecutableFlowSuite {
                 let result = try await Build.build(
                     at: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     )
                 )
 

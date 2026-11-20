@@ -182,14 +182,12 @@ public extension Build {
         if captureOutput {
             result = try await captured(
                 at: plan.request.project,
-                config: plan.request.config,
-                argv_audit: plan.request.source.arguments
+                config: plan.request.config
             )
         } else {
             result = try await build(
                 at: plan.request.project,
-                config: plan.request.config,
-                argv_audit: plan.request.source.arguments
+                config: plan.request.config
             )
         }
 

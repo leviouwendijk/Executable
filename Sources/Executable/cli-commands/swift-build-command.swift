@@ -199,7 +199,6 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
     public static func projectDefaultRequest(
         from directory: URL,
-        updateBuiltOnSuccess: Bool = true,
         approvedAncestorConfiguration: URL? = nil
     ) throws -> Build.Request {
         let root = directory.standardizedFileURL
@@ -220,7 +219,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         guard let objectURL else {
             return Build.Request(
                 project: root,
-                config: .init(mode: .release, updateBuiltOnSuccess: updateBuiltOnSuccess),
+                config: .init(mode: .release),
                 source: .direct(arguments: [])
             )
         }
@@ -229,7 +228,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         guard var arguments = try flaglessArguments(from: objectURL) else {
             return Build.Request(
                 project: root,
-                config: .init(mode: .release, updateBuiltOnSuccess: updateBuiltOnSuccess),
+                config: .init(mode: .release),
                 source: .direct(arguments: [])
             )
         }
@@ -248,8 +247,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         return try request(
             from: options,
             source: .buildObject(url: objectURL, arguments: arguments),
-            defaultProject: root,
-            updateBuiltOnSuccess: updateBuiltOnSuccess
+            defaultProject: root
         )
     }
 
@@ -257,8 +255,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
     /// A test package's package.frame builds plainly.
     static func flaglessArguments(from configuration: URL) throws -> [String]? {
         guard configuration.lastPathComponent == PackageFrame.fileName else {
-            let legacy = try BuildObjectConfiguration(from: configuration)
-            return legacy.compile.use ? legacy.compile.arguments : nil
+            throw ConfigurationFileError.legacy(configuration)
         }
         guard case .package(let package) = try PackageFrame.read(configuration) else { return nil }
         return package.flaglessArguments
@@ -266,13 +263,11 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
 
     public static func request(
         arguments: [String],
-        defaultProject: URL,
-        updateBuiltOnSuccess: Bool = true
+        defaultProject: URL
     ) throws -> Build.Request {
         guard !arguments.isEmpty else {
             return try projectDefaultRequest(
-                from: defaultProject,
-                updateBuiltOnSuccess: updateBuiltOnSuccess
+                from: defaultProject
             )
         }
 
@@ -290,8 +285,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             source: .direct(
                 arguments: arguments
             ),
-            defaultProject: defaultProject,
-            updateBuiltOnSuccess: updateBuiltOnSuccess
+            defaultProject: defaultProject
         )
     }
 }
@@ -389,8 +383,7 @@ private extension SwiftBuildCommand {
         defaultProject: URL = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
             isDirectory: true
-        ),
-        updateBuiltOnSuccess: Bool = true
+        )
     ) throws -> Build.Request {
         let project = options.project.map {
             URL(
@@ -444,8 +437,7 @@ private extension SwiftBuildCommand {
         return Build.Request(
             project: project,
             config: .init(
-                mode: options.debug ? .debug : .release,
-                updateBuiltOnSuccess: updateBuiltOnSuccess
+                mode: options.debug ? .debug : .release
             ),
             destination: destination,
             deploy: !(options.local || options.repo || options.noMove),

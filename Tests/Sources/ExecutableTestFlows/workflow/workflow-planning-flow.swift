@@ -211,19 +211,11 @@ private struct TypedWorkflowFixture {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try write(original, to: ".sbm/workflows.pkl")
         for (folder, product) in [("Agentic", "t_agentic"), ("AgenticRuntime", "t_ar_main"), ("AgenticIO", "t_aio_all"), ("AgenticMedia", "amtest")] {
-            try write("// swift-tools-version: 6.2\nimport PackageDescription\nlet package = Package(name: \"\(folder)\", products: [.executable(name: \"\(product)\", targets: [\"Tests\"])], targets: [.executableTarget(name: \"Tests\")])", to: "\(folder)/Package.swift")
-            try write("print(\"fixture\")", to: "\(folder)/Sources/Tests/main.swift")
-            try write("""
-            uuid = "00000000-0000-0000-0000-000000000001"
-            name = "\(folder)"
-            types { "binary" }
-            versions { release { major = 1 minor = 0 patch = 0 } }
-            compile { use = false arguments {} }
-            tests { primary = "\(product)" }
-            details = ""
-            author = ""
-            update = ""
-            """, to: "\(folder)/build-object.pkl")
+            try write("// swift-tools-version: 6.2\nimport PackageDescription\nlet package = Package(name: \"\(folder)\", targets: [])", to: "\(folder)/Package.swift")
+            try write("import Executable;\n\nlet package: Package = .{};\n", to: "\(folder)/package.frame")
+            try write("// swift-tools-version: 6.2\nimport PackageDescription\nlet package = Package(name: \"\(folder)Tests\", products: [.executable(name: \"\(product)\", targets: [\"Tests\"])], targets: [.executableTarget(name: \"Tests\")])", to: "\(folder)/Tests/Package.swift")
+            try write("print(\"fixture\")", to: "\(folder)/Tests/Sources/Tests/main.swift")
+            try write("import Executable;\n\nlet tests: Tests = .{ .primary = \"\(product)\" };\n", to: "\(folder)/Tests/package.frame")
         }
         try write("// swift-tools-version: 6.2\nimport PackageDescription\nlet package = Package(name: \"AgenticHost\", targets: [])", to: "AgenticHost/Package.swift")
         try FileManager.default.createDirectory(at: root.appendingPathComponent("nested"), withIntermediateDirectories: true)

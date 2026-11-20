@@ -1,0 +1,23 @@
+import Executable
+import Foundation
+import Version
+
+public enum ExecutableObjectType: String, RawRepresentable, Codable, Sendable, CaseIterable {
+    case binary
+    case application
+    case script
+    case library
+    case specification
+    case resource
+}
+
+extension Array where Element == ExecutableObjectType {
+    public func set() -> Set<String> {
+        var acc: Set<String> = []
+        for i in self {
+            let string = i.rawValue
+            acc.insert(string)
+        }
+        return acc
+    }
+}

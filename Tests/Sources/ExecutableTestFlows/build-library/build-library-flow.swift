@@ -60,8 +60,7 @@ extension ExecutableFlowSuite {
                 let arguments = BuildLibrary.buildArguments(
                     targetName: "FixtureCore",
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     )
                 )
 
@@ -97,8 +96,7 @@ extension ExecutableFlowSuite {
                 let output = try await BuildLibrary.buildAndExport(
                     at: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     ),
                     local: false,
                     modulesRoot: modulesRoot

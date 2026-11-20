@@ -23,6 +23,7 @@ let package = Package(
             name: "ExecutableTests",
             dependencies: [
                 .product(name: "Executable", package: "Executable"),
+                .product(name: "ExecutableLegacy", package: "Executable"),
                 .product(name: "Testing", package: "Testing"),
             ]
         ),
@@ -38,6 +39,7 @@ let package = Package(
             name: "ExecutableTestFlows",
             dependencies: [
                 .product(name: "Executable", package: "Executable"),
+                .product(name: "ExecutableLegacy", package: "Executable"),
                 .product(name: "TestFlows", package: "TestFlows"),
             ]
         ),

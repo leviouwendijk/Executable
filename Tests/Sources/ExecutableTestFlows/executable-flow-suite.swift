@@ -21,6 +21,7 @@ enum ExecutableFlowSuite: TestFlowRegistry {
         workflowExecutionFlow,
         workflowPackageFlow,
         configurationDiscoveryFlow,
+        packageFrameMigrationFlow,
         pklRenderingFlow,
         packageCommandFlow,
         commandFamilyFlow,

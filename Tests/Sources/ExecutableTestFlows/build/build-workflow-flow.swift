@@ -27,8 +27,7 @@ extension ExecutableFlowSuite {
                         "--products",
                         "fixture-cli",
                     ],
-                    defaultProject: fixture.root,
-                    updateBuiltOnSuccess: false
+                    defaultProject: fixture.root
                 )
 
                 try Expect.equal(
@@ -55,7 +54,7 @@ extension ExecutableFlowSuite {
                 )
             }
 
-            Step("build-object defaults lower into the same typed request") {
+            Step("package.frame defaults lower into the same typed request") {
                 let fixture = try SwiftPackageFixture()
 
                 defer {
@@ -63,29 +62,15 @@ extension ExecutableFlowSuite {
                 }
 
                 let buildObject = fixture.root.appendingPathComponent(
-                    "build-object.pkl"
+                    "package.frame"
                 )
 
                 try """
-                uuid = "00000000-0000-0000-0000-000000000001"
-                name = "ExecutableFixture"
-                types {
-                    "binary"
-                }
-                versions {
-                    release {
-                        major = 1
-                        minor = 0
-                        patch = 0
-                    }
-                }
-                compile {
-                    use = true
-                    arguments { "--debug" "--local" "--products" "fixture-cli" }
-                }
-                details = ""
-                author = ""
-                update = ""
+                import Executable;
+
+                let package: Package = .{
+                    .build = .{ .arguments = ["--debug", "--products", "fixture-cli"] },
+                };
                 """.write(
                     to: buildObject,
                     atomically: true,
@@ -93,19 +78,18 @@ extension ExecutableFlowSuite {
                 )
 
                 let request = try SwiftBuildCommand.projectDefaultRequest(
-                    from: fixture.root,
-                    updateBuiltOnSuccess: false
+                    from: fixture.root
                 )
 
                 try Expect.equal(
                     request.config.buildDirComponent,
                     "debug",
-                    "build-object debug option lowers into Build.Config"
+                    "package.frame debug option lowers into Build.Config"
                 )
 
                 try Expect.false(
                     request.deploy,
-                    "build-object local option suppresses deployment"
+                    "package.frame without .deploy suppresses deployment"
                 )
 
                 switch request.source {
@@ -113,18 +97,18 @@ extension ExecutableFlowSuite {
                     try Expect.equal(
                         url,
                         buildObject,
-                        "build request retains build-object source identity"
+                        "build request retains package.frame source identity"
                     )
 
                     try Expect.equal(
                         arguments,
                         [
                             "--debug",
-                            "--local",
                             "--products",
                             "fixture-cli",
+                            "--no-move",
                         ],
-                        "build request retains build-object audit arguments"
+                        "build request retains package.frame audit arguments"
                     )
 
                 case .direct:
@@ -144,7 +128,7 @@ extension ExecutableFlowSuite {
                 )
             }
 
-            Step("build-object signing arguments lower into typed build signing policy") {
+            Step("package.frame signing arguments lower into typed build signing policy") {
                 let fixture = try SwiftPackageFixture()
 
                 defer {
@@ -152,38 +136,20 @@ extension ExecutableFlowSuite {
                 }
 
                 let buildObject = fixture.root.appendingPathComponent(
-                    "build-object.pkl"
+                    "package.frame"
                 )
 
                 try """
-                uuid = "00000000-0000-0000-0000-000000000001"
-                name = "ExecutableFixture"
-                types {
-                    "binary"
-                }
-                versions {
-                    release {
-                        major = 1
-                        minor = 0
-                        patch = 0
-                    }
-                }
-                compile {
-                    use = true
-                    arguments {
-                        "--debug"
-                        "--local"
-                        "--products"
-                        "fixture-cli"
-                        "--sign"
-                        "ad-hoc"
-                        "--sign-identifier"
-                        "com.executable.build-object-signing"
-                    }
-                }
-                details = ""
-                author = ""
-                update = ""
+                import Executable;
+
+                let package: Package = .{
+                    .build = .{ .arguments = [
+                        "--debug",
+                        "--products", "fixture-cli",
+                        "--sign", "ad-hoc",
+                        "--sign-identifier", "com.executable.build-object-signing",
+                    ] },
+                };
                 """.write(
                     to: buildObject,
                     atomically: true,
@@ -191,8 +157,7 @@ extension ExecutableFlowSuite {
                 )
 
                 let request = try SwiftBuildCommand.projectDefaultRequest(
-                    from: fixture.root,
-                    updateBuiltOnSuccess: false
+                    from: fixture.root
                 )
 
                 guard let configuration = request.signing.defaultConfiguration else {
@@ -247,8 +212,7 @@ extension ExecutableFlowSuite {
                         "--sign-identifier",
                         "com.executable.canonical-build-signing",
                     ],
-                    defaultProject: fixture.root,
-                    updateBuiltOnSuccess: false
+                    defaultProject: fixture.root
                 )
                 let plan = try await Build.resolve(
                     request
@@ -298,8 +262,7 @@ extension ExecutableFlowSuite {
                 let request = Build.Request(
                     project: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     ),
                     deploy: false,
                     selection: .init(

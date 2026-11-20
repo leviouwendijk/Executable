@@ -8,14 +8,7 @@ public enum SwiftIncrementCommand: RunnableArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Release the next version: for a package.frame project, tag HEAD and push the tag; for build-object.pkl, bump the file"
-            ),
-            opt(
-                "target",
-                short: "t",
-                as: VersionReference.self,
-                default: .release,
-                help: "Which version to bump: release (default) or compiled"
+                "Release the next version: tag HEAD with it and push the tag"
             ),
             arg(
                 "level",
@@ -28,49 +21,25 @@ public enum SwiftIncrementCommand: RunnableArgumentCommand {
     public static func run(
         _ invocation: ParsedInvocation
     ) async throws {
-        let target = try invocation.value(
-            "target",
-            as: VersionReference.self,
-            default: .release
-        )
-
         let level = try invocation.require(
             "level",
             as: ObjectVersionLevel.self
         )
-
         let directory = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
             isDirectory: true
         )
 
-        if try PackageFrame.package(in: directory) != nil {
-            guard target == .release else {
-                print("package.frame projects keep no compiled version; a deploy records what was built.")
-                return
+        guard try PackageFrame.package(in: directory) != nil else {
+            if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: directory) {
+                throw ConfigurationFileError.legacy(legacy)
             }
-            let result = try await ReleaseTags.increment(level, at: directory)
-            print(
-                "Tagged \(ReleaseTags.name(for: result.to)) (was \(result.from.map(ReleaseTags.name(for:)) ?? "untagged")) and pushed the tag."
-            )
-            return
+            throw BuildObjectDiscoveryError.notFound(filename: PackageFrame.fileName, maxDepth: 1, startURL: directory)
         }
 
-        switch target {
-        case .release:
-            let result = try ExecutableVersion.incrementRelease(
-                at: directory,
-                level: level
-            )
-
-            print(
-                "Updated \(target.rawValue) → \(result.after.string(prefixStyle: .short))"
-            )
-
-        case .compiled:
-            print(
-                "Do not manually increment compiled object, build in order to do so."
-            )
-        }
+        let result = try await ReleaseTags.increment(level, at: directory)
+        print(
+            "Tagged \(ReleaseTags.name(for: result.to)) (was \(result.from.map(ReleaseTags.name(for:)) ?? "untagged")) and pushed the tag."
+        )
     }
 }

@@ -176,41 +176,9 @@ public struct ObjectRenewer: Sendable {
                 printi("Behind the release (\(status.release.map(ReleaseTags.name(for:)) ?? "untagged")): \(status.behind.joined(separator: ", ")); compiling…")
                 try await execute(in: resolvedPaths.directory)
             }
-        } else if compilable {
-            let obj_url = try BuildObjectDiscovery.requireConfiguration(in: resolvedPaths.directory)
-            let obj = try BuildObjectConfiguration(from: obj_url)
-
-            let v_release = obj.versions.release
-
-            // soft try to get compiled.pkl
-            let compl_url_soft = try BuildObjectDiscovery.compiled(for: obj_url)
-
-            var reasonToCompile = false
-
-            if let compl_url_found = compl_url_soft {
-                let compl_cfg = try CompiledLocalBuildObject(from: compl_url_found)
-                let v_compiled = compl_cfg.version
-                
-                let c = v_compiled
-                let r = v_release
-                let builtIsBehind = (c.major, c.minor, c.patch) < (r.major, r.minor, r.patch)
-
-                if !builtIsBehind {
-                    printi("Built version seems up-to-date; skipping compile.")
-                } else {
-                    reasonToCompile = true
-                    printi("Built version is now behind repository recompiling…")
-                    printi("compiled:   \(v_compiled.string(prefixStyle: .none))", times: 2)
-                    printi("release:    \(v_release.string(prefixStyle: .none))", times: 2)
-                }
-            } else {
-                printi("No \(BuildObjectDiscovery.legacyCompiled) detected; compiling…")
-                reasonToCompile = true
-            }
-
-            if reasonToCompile {
-                try await execute(in: resolvedPaths.directory)
-            }
+        } else if compilable,
+                  try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: resolvedPaths.directory) != nil {
+            printi("Legacy build-object.pkl; run `sbm modernize` there. Skipping compile.")
         }
     }
 

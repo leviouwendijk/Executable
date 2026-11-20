@@ -85,29 +85,15 @@ extension ExecutableFlowSuite {
                 }
 
                 let buildObject = fixture.root.appendingPathComponent(
-                    "build-object.pkl"
+                    "package.frame"
                 )
 
                 try """
-                uuid = "00000000-0000-0000-0000-000000000002"
-                name = "ExecutableFixture"
-                types {
-                    "binary"
-                }
-                versions {
-                    release {
-                        major = 1
-                        minor = 0
-                        patch = 0
-                    }
-                }
-                compile {
-                    use = true
-                    arguments { "--debug" "--local" "--products" "fixture-cli" }
-                }
-                details = ""
-                author = ""
-                update = ""
+                import Executable;
+
+                let package: Package = .{
+                    .build = .{ .arguments = ["--debug", "--products", "fixture-cli"] },
+                };
                 """.write(
                     to: buildObject,
                     atomically: true,

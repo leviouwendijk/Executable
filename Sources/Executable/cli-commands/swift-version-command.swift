@@ -48,34 +48,9 @@ public enum SwiftVersionCommand: RunnableArgumentCommand {
             return
         }
 
-        let objectURL = try BuildObjectDiscovery.requireLocal(named: BuildObjectDiscovery.legacyConfiguration, in: current)
-        let object = try BuildObjectConfiguration(
-            from: objectURL
-        )
-
-        let compiledURL = try BuildObjectDiscovery.requireLocal(
-            named: BuildObjectDiscovery.legacyCompiled, in: current
-        )
-        let compiled = try CompiledLocalBuildObject(
-            from: compiledURL
-        )
-
-        print("name: \(object.name)")
-        print("types: \(object.types.map(\.rawValue).joined(separator: ", "))")
-        print("versions:")
-        printi(
-            "compiled:   \(compiled.version.string(prefixStyle: .none))"
-        )
-        printi(
-            "release:    \(object.versions.release.string(prefixStyle: .none))"
-        )
-
-        if let divergence = try? await GitRepo.divergence(
-            objectURL.deletingLastPathComponent()
-        ) {
-            print(
-                "git: ahead \(divergence.ahead), behind \(divergence.behind)"
-            )
+        if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: current) {
+            throw ConfigurationFileError.legacy(legacy)
         }
+        throw BuildObjectDiscoveryError.notFound(filename: PackageFrame.fileName, maxDepth: 1, startURL: current)
     }
 }

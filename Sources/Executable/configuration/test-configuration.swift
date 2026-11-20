@@ -1,7 +1,7 @@
 import Foundation
 
 /// Test products, reusable by `sbm test` and workflows: the `tests` binding of a test
-/// package's package.frame, or a legacy build-object.pkl `tests { }` section.
+/// package's package.frame.
 public struct TestConfiguration: Codable, Sendable, Equatable {
     public let primary: String?
     public let groups: [String: [String]]
@@ -99,20 +99,6 @@ public struct TestConfiguration: Codable, Sendable, Equatable {
             }
             return [name]
         }
-    }
-
-    public func contents() -> String {
-        var lines = ["tests {"]
-        if let primary { lines.append("    primary = \(PklText.quote(primary))") }
-        if !groups.isEmpty {
-            lines.append("    groups {")
-            for name in groups.keys.sorted() {
-                lines.append(PklText.collection(name, values: groups[name] ?? [], indent: 2))
-            }
-            lines.append("    }")
-        }
-        lines.append("}")
-        return lines.joined(separator: "\n")
     }
 
     private func declaredProducts() -> [String] {

@@ -6,8 +6,7 @@ import IO
 /// Test packages are nested packages directly below a project: a directory with a
 /// Package.swift (depending on the project by path) and a package.frame declaring
 /// `let tests: Tests`. `Tests/` is the conventional one; others (`Benchmarks/`) work the
-/// same way. Projects not yet split keep their test products in the root package, declared
-/// in build-object.pkl `tests { }`.
+/// same way.
 public enum Tests {
     public static let conventionalDirectory = "Tests"
 
@@ -71,7 +70,7 @@ public enum Tests {
         }
 
         let packages = try testPackages(in: project)
-        guard !packages.isEmpty else { return try await legacyPlan(at: project, selection: selection) }
+        guard !packages.isEmpty else { try legacyPlan(at: project) }
         return Plan(project: project, runs: try await runs(of: packages, parent: project, selection: selection))
     }
 
@@ -171,15 +170,10 @@ private extension Tests {
         return runs
     }
 
-    static func legacyPlan(
-        at project: URL,
-        selection: TestConfiguration.Selection
-    ) async throws -> Plan {
-        guard let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
-              let tests = try BuildObjectConfiguration(from: legacy).tests
-        else { throw RunError.notConfigured(project) }
-        let available = Set(try await Products.executableNames(in: project))
-        let products = try tests.selectedProducts(for: selection, availableProducts: available)
-        return Plan(project: project, runs: [Run(package: project, products: products)])
+    static func legacyPlan(at project: URL) throws -> Never {
+        if let legacy = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project) {
+            throw ConfigurationFileError.legacy(legacy)
+        }
+        throw RunError.notConfigured(project)
     }
 }

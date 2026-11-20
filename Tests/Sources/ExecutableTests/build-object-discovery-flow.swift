@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import Executable
+import ExecutableLegacy
 
 extension ExecutableTestSuite {
     static let discoverySuite = TestSuite(

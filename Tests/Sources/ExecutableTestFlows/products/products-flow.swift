@@ -99,8 +99,7 @@ extension ExecutableFlowSuite {
                 _ = try await Build.build(
                     at: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     )
                 )
 
@@ -141,8 +140,7 @@ extension ExecutableFlowSuite {
                 _ = try await Build.build(
                     at: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     )
                 )
 
@@ -155,8 +153,7 @@ extension ExecutableFlowSuite {
                 try Deploy.selected(
                     from: fixture.root,
                     config: .init(
-                        mode: .debug,
-                        updateBuiltOnSuccess: false
+                        mode: .debug
                     ),
                     to: destination,
                     products: [

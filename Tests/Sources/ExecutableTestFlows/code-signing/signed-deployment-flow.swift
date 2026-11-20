@@ -17,7 +17,7 @@ extension ExecutableFlowSuite {
 
                 _ = try await Build.build(
                     at: fixture.root,
-                    config: .init(mode: .debug, updateBuiltOnSuccess: false)
+                    config: .init(mode: .debug)
                 )
 
                 let destination = fixture.root.appendingPathComponent(

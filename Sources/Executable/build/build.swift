@@ -13,11 +13,9 @@ public enum Build {
         }
 
         public let mode: Mode
-        public let updateBuiltOnSuccess: Bool
 
-        public init(mode: Mode, updateBuiltOnSuccess: Bool = true) {
+        public init(mode: Mode) {
             self.mode = mode
-            self.updateBuiltOnSuccess = updateBuiltOnSuccess
         }
 
         public var buildArgs: [String] { mode == .debug ? ["build","-c","debug"] : ["build","-c","release"] }
@@ -26,53 +24,20 @@ public enum Build {
 
     /// Full build with streamed output (same as `swift build -c <mode>`).
     @discardableResult
-    public static func build(at dir: URL, config: Config, argv_audit: [String]? = nil) async throws -> BuildResult {
-        let result = try await runSwift(command: config.buildArgs, in: dir)
-
-        if config.updateBuiltOnSuccess {
-            do {
-                try updateBuiltVersionSnapshot(at: dir, argv: argv_audit)
-            } catch {
-                // non-fatal; surface a short diagnostic and keep going
-                fputs("Note: failed to update built version snapshot:\n", stderr)
-                fputs("\(error.localizedDescription.indent())\n", stderr)
-            }
-        }
-
-        return result
+    public static func build(at dir: URL, config: Config) async throws -> BuildResult {
+        try await runSwift(command: config.buildArgs, in: dir)
     }
 
     @discardableResult
     public static func captured(
         at dir: URL,
-        config: Config,
-        argv_audit: [String]? = nil
+        config: Config
     ) async throws -> BuildResult {
-        let result = try await runSwift(
+        try await runSwift(
             command: config.buildArgs,
             in: dir,
             onOutput: nil
         )
-
-        if config.updateBuiltOnSuccess {
-            do {
-                try updateBuiltVersionSnapshot(
-                    at: dir,
-                    argv: argv_audit
-                )
-            } catch {
-                fputs(
-                    "Note: failed to update built version snapshot:\n",
-                    stderr
-                )
-                fputs(
-                    "\(error.localizedDescription.indent())\n",
-                    stderr
-                )
-            }
-        }
-
-        return result
     }
 
     /// Alias kept for clarity when a caller semantically means “build only”.
@@ -210,54 +175,4 @@ public enum Build {
     //         buildDirComponent: (mode == .debug ? "debug" : "release")
     //     )
     // }
-
-    private static func updateBuiltVersionSnapshot(at dir: URL, argv: [String]? = nil) throws {
-        let project = dir.standardizedFileURL
-        // No local build-object means no local snapshot. Never adopt parent metadata.
-        // package.frame projects keep no compiled state; their versions come from git tags.
-        guard let objectURL = try BuildObjectDiscovery.local(named: BuildObjectDiscovery.legacyConfiguration, in: project),
-              try BuildObjectDiscovery.local(named: BuildObjectDiscovery.preferredConfiguration, in: project) == nil
-        else { return }
-        let configuration = try BuildObjectConfiguration(from: objectURL)
-        let release = configuration.versions.release
-        let compiledURL = BuildObjectDiscovery.compiledURL(for: objectURL)
-        let compiledName = compiledURL.lastPathComponent
-        try BuildObjectDiscovery.requireOwned(compiledURL, by: project)
-
-        // A symlinked .gitignore could otherwise mutate a file outside the project.
-        try BuildObjectDiscovery.requireOwned(project.appendingPathComponent(".gitignore"), by: project)
-        let ignorable: [String] = [compiledName, "/\(compiledName)", "**/\(compiledName)"]
-        do {
-            let (result, context) = try GitRepo.appending(
-                ignorable: ignorable, to: ".gitignore", in: project
-            )
-            switch result {
-            case .appended:
-                print("added to .gitignore: \(ignorable.joined(separator: ", "))")
-                print("snippet:")
-                printi(context.ansi(.brightBlack))
-            case .alreadyPresent:
-                break
-            case .notFound:
-                print(context)
-            }
-        } catch {
-            fputs("note: could not update .gitignore: \(error)\n", stderr)
-        }
-
-        let recordedArguments = argv ?? []
-        if let existing = try BuildObjectDiscovery.compiled(for: objectURL) {
-            let compiled = try CompiledLocalBuildObject(from: existing)
-            if compiled.version == release && compiled.arguments == recordedArguments {
-                print("compiled version and arguments unchanged")
-                print("no \(compiledName) written")
-                return
-            }
-            print("compiled version or arguments changed")
-        }
-        print("writing \(compiledName)…")
-        let updated = CompiledLocalBuildObject(version: release, arguments: recordedArguments)
-        try updated.write(to: compiledURL)
-        print("compiled version += \(release.string(prefixStyle: .none))")
-    }
 }

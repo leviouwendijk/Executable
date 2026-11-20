@@ -117,7 +117,7 @@ private struct SinglePackageFixture {
     init(withTests: Bool) throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("sbm-pkg-\(UUID().uuidString)", isDirectory: true)
         package = root.appendingPathComponent("Runtime", isDirectory: true)
-        try FileManager.default.createDirectory(at: package.appendingPathComponent("Sources/FixtureTests"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent(".sbm"), withIntermediateDirectories: true)
         try """
         packages { runtime = "Runtime" }
@@ -126,21 +126,21 @@ private struct SinglePackageFixture {
         try """
         // swift-tools-version: 6.2
         import PackageDescription
-        let package = Package(name: "Runtime", products: [.executable(name: "fixture_tests", targets: ["FixtureTests"])], targets: [.executableTarget(name: "FixtureTests")])
+        let package = Package(name: "Runtime", targets: [])
         """.write(to: package.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try "print(\"fixture\")\n".write(to: package.appendingPathComponent("Sources/FixtureTests/main.swift"), atomically: true, encoding: .utf8)
+        try "import Executable;\n\nlet package: Package = .{};\n"
+            .write(to: package.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
         if withTests {
+            let tests = package.appendingPathComponent("Tests", isDirectory: true)
+            try FileManager.default.createDirectory(at: tests.appendingPathComponent("Sources/FixtureTests"), withIntermediateDirectories: true)
             try """
-            uuid = "00000000-0000-0000-0000-000000000003"
-            name = "Runtime"
-            types { "binary" }
-            versions { release { major = 1 minor = 0 patch = 0 } }
-            compile { use = false arguments { } }
-            tests { primary = "fixture_tests" }
-            details = ""
-            author = ""
-            update = ""
-            """.write(to: package.appendingPathComponent("build-object.pkl"), atomically: true, encoding: .utf8)
+            // swift-tools-version: 6.2
+            import PackageDescription
+            let package = Package(name: "RuntimeTests", products: [.executable(name: "fixture_tests", targets: ["FixtureTests"])], targets: [.executableTarget(name: "FixtureTests")])
+            """.write(to: tests.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+            try "print(\"fixture\")\n".write(to: tests.appendingPathComponent("Sources/FixtureTests/main.swift"), atomically: true, encoding: .utf8)
+            try "import Executable;\n\nlet tests: Tests = .{ .primary = \"fixture_tests\" };\n"
+                .write(to: tests.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
         }
     }
 

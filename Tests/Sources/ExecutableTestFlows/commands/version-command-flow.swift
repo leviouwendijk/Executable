@@ -1,5 +1,6 @@
 import Arguments
 import Executable
+import ExecutableLegacy
 import TestFlows
 import Version
 
@@ -24,35 +25,31 @@ extension ExecutableFlowSuite {
                     "config",
                     "increment",
                     "update",
-                    "modernize",
                     "version",
-                    "remote",
                 ] {
                     try Expect.true(
                         names.contains(name),
                         "sbm root contains \(name)"
                     )
                 }
+                try Expect.false(names.contains("modernize"), "core sbm has no legacy migration")
+                try Expect.false(names.contains("remote"), "the pkl update URL command is gone")
+
+                let migration = try SwiftBuildManagerMigrationCommand.spec()
+                    .children
+                    .map {
+                        $0.name.rawValue
+                    }
+                try Expect.equal(migration, names + ["modernize"], "the migration root adds modernize to core")
             }
 
             Step("increment parses native typed bump values") {
                 let invocation = try Arguments.parse(
                     [
                         "increment",
-                        "--target",
-                        "release",
                         "minor",
                     ],
                     spec: try SwiftBuildManagerCommand.spec()
-                )
-
-                try Expect.equal(
-                    try invocation.value(
-                        "target",
-                        as: VersionReference.self
-                    ),
-                    .release,
-                    "increment target parses through ArgumentValue"
                 )
 
                 try Expect.equal(
@@ -62,27 +59,6 @@ extension ExecutableFlowSuite {
                     ),
                     .minor,
                     "increment level parses through ArgumentValue"
-                )
-            }
-
-            Step("remote subcommands resolve canonically") {
-                let invocation = try Arguments.parse(
-                    [
-                        "remote",
-                        "open",
-                        "--branch",
-                    ],
-                    spec: try SwiftBuildManagerCommand.spec()
-                )
-
-                try Expect.equal(
-                    invocation.commandPath.map(\.rawValue),
-                    [
-                        "sbm",
-                        "remote",
-                        "open",
-                    ],
-                    "remote open resolves canonical path"
                 )
             }
         }

@@ -13,6 +13,11 @@ let package = Package(
             name: "Executable",
             targets: ["Executable"]
         ),
+        // build-object.pkl: reading it and migrating it to package.frame (`sbm modernize`).
+        .library(
+            name: "ExecutableLegacy",
+            targets: ["ExecutableLegacy"]
+        ),
     ],
     dependencies: [
         .package(
@@ -72,6 +77,17 @@ let package = Package(
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "IO", package: "IO"),
                 .product(name: "Readers", package: "Readers"),
+                .product(name: "Arguments", package: "Arguments"),
+            ]
+        ),
+        .target(
+            name: "ExecutableLegacy",
+            dependencies: [
+                "Executable",
+                .product(name: "plate", package: "plate"),
+                .product(name: "Interfaces", package: "Interfaces"),
+                .product(name: "Version", package: "Version"),
+                .product(name: "Parsers", package: "Parsers"),
                 .product(name: "Arguments", package: "Arguments"),
             ]
         ),

@@ -4,16 +4,16 @@ import TestFlows
 
 extension ExecutableFlowSuite {
     static var configurationDiscoveryFlow: TestFlow {
-        TestFlow("configuration-discovery", tags: ["build", "pkl", "boundary"]) {
+        TestFlow("configuration-discovery", tags: ["build", "frame", "boundary"]) {
             Step("implicit configuration lookup never inherits from a parent") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
                 let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
                 try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                let ancestor = fixture.root.appendingPathComponent("build-object.pkl")
+                let ancestor = fixture.root.appendingPathComponent("package.frame")
                 try fixtureConfig().write(to: ancestor, atomically: true, encoding: .utf8)
                 let request = try SwiftBuildCommand.projectDefaultRequest(
-                    from: child, updateBuiltOnSuccess: false
+                    from: child
                 )
                 switch request.source {
                 case .direct:
@@ -29,10 +29,10 @@ extension ExecutableFlowSuite {
                 defer { fixture.remove() }
                 let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
                 try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                let ancestor = fixture.root.appendingPathComponent("build-object.pkl")
+                let ancestor = fixture.root.appendingPathComponent("package.frame")
                 try fixtureConfig().write(to: ancestor, atomically: true, encoding: .utf8)
                 let request = try SwiftBuildCommand.projectDefaultRequest(
-                    from: child, updateBuiltOnSuccess: false,
+                    from: child,
                     approvedAncestorConfiguration: ancestor
                 )
                 switch request.source {
@@ -49,12 +49,12 @@ extension ExecutableFlowSuite {
                 defer { fixture.remove() }
                 let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
                 try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                let ancestor = fixture.root.appendingPathComponent("build-object.pkl")
-                let local = child.appendingPathComponent("build-object.pkl")
+                let ancestor = fixture.root.appendingPathComponent("package.frame")
+                let local = child.appendingPathComponent("package.frame")
                 try fixtureConfig().write(to: ancestor, atomically: true, encoding: .utf8)
                 try fixtureConfig().write(to: local, atomically: true, encoding: .utf8)
                 let request = try SwiftBuildCommand.projectDefaultRequest(
-                    from: child, updateBuiltOnSuccess: false,
+                    from: child,
                     approvedAncestorConfiguration: ancestor
                 )
                 switch request.source {
@@ -65,100 +65,49 @@ extension ExecutableFlowSuite {
                 }
             }
 
-            Step("symlinked compiled file outside project is rejected") {
+            Step("a build leaves no compiled state in the project") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
-                let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
-                try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                let ancestorCompiled = fixture.root.appendingPathComponent("compiled.pkl")
-                try "do-not-touch".write(to: ancestorCompiled, atomically: true, encoding: .utf8)
-                let nestedCompiled = child.appendingPathComponent("compiled.pkl")
-                try FileManager.default.createSymbolicLink(at: nestedCompiled, withDestinationURL: ancestorCompiled)
-                try Expect.false(
-                    (try? BuildObjectDiscovery.requireOwned(nestedCompiled, by: child)) != nil,
-                    "out-of-root symlink must be denied"
-                )
-                try Expect.equal(
-                    try String(contentsOf: ancestorCompiled, encoding: .utf8),
-                    "do-not-touch", "no metadata altered"
-                )
-            }
-
-            Step("nested build does not rewrite parent's compiled snapshot") {
-                let fixture = try SwiftPackageFixture()
-                defer { fixture.remove() }
-                let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
-                try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                try FileManager.default.copyItem(
-                    at: fixture.root.appendingPathComponent("Package.swift"),
-                    to: child.appendingPathComponent("Package.swift")
-                )
-                try FileManager.default.copyItem(
-                    at: fixture.root.appendingPathComponent("Sources", isDirectory: true),
-                    to: child.appendingPathComponent("Sources", isDirectory: true)
-                )
-                let parentObject = fixture.root.appendingPathComponent("build-object.pkl")
-                let parentCompiled = fixture.root.appendingPathComponent("compiled.pkl")
-                try fixtureConfig().write(to: parentObject, atomically: true, encoding: .utf8)
-                try "parent-snapshot-must-survive".write(to: parentCompiled, atomically: true, encoding: .utf8)
-                _ = try await Build.captured(
-                    at: child,
-                    config: .init(mode: .debug, updateBuiltOnSuccess: true)
-                )
-                try Expect.equal(
-                    try String(contentsOf: parentCompiled, encoding: .utf8),
-                    "parent-snapshot-must-survive", "parent compiled metadata untouched"
-                )
-                try Expect.false(
-                    FileManager.default.fileExists(atPath: child.appendingPathComponent("compiled.pkl").path),
-                    "do not synthesize compiled.pkl for nested package without local configuration"
-                )
-            }
-
-            Step("successful locally configured build writes only local compiled snapshot") {
-                let fixture = try SwiftPackageFixture()
-                defer { fixture.remove() }
-                let child = fixture.root.appendingPathComponent("nested", isDirectory: true)
-                try FileManager.default.createDirectory(at: child, withIntermediateDirectories: true)
-                try FileManager.default.copyItem(
-                    at: fixture.root.appendingPathComponent("Package.swift"),
-                    to: child.appendingPathComponent("Package.swift")
-                )
-                try FileManager.default.copyItem(
-                    at: fixture.root.appendingPathComponent("Sources", isDirectory: true),
-                    to: child.appendingPathComponent("Sources", isDirectory: true)
-                )
-                let parentCompiled = fixture.root.appendingPathComponent("compiled.pkl")
-                try "parent-snapshot-must-survive".write(to: parentCompiled, atomically: true, encoding: .utf8)
                 try fixtureConfig().write(
-                    to: child.appendingPathComponent("build-object.pkl"), atomically: true, encoding: .utf8
+                    to: fixture.root.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8
                 )
                 _ = try await Build.captured(
-                    at: child,
-                    config: .init(mode: .debug, updateBuiltOnSuccess: true)
+                    at: fixture.root,
+                    config: .init(mode: .debug)
                 )
-                let compiled = try CompiledLocalBuildObject(from: child.appendingPathComponent("compiled.pkl"))
-                try Expect.equal(compiled.version.major, 1, "local release version is snapshotted")
-                try Expect.equal(
-                    try String(contentsOf: parentCompiled, encoding: .utf8),
-                    "parent-snapshot-must-survive", "parent snapshot untouched"
-                )
+                for name in ["compiled.pkl", "compiled.frame"] {
+                    try Expect.false(
+                        FileManager.default.fileExists(atPath: fixture.root.appendingPathComponent(name).path),
+                        "\(name) is not written; deploy metadata records what was built"
+                    )
+                }
             }
 
-            Step("stored Pkl arguments cannot redirect the project root") {
+            Step("stored build arguments cannot redirect the project root") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }
-                let source = fixture.root.appendingPathComponent("build-object.pkl")
                 let text = fixtureConfig().replacingOccurrences(
-                    of: "--debug" , with: "--project"
-                ).replacingOccurrences(
-                    of: "--local", with: ".."
+                    of: #""--debug""#, with: #""--project", "..""#
                 )
-                try text.write(to: source, atomically: true, encoding: .utf8)
+                try text.write(to: fixture.root.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
                 let result = try? SwiftBuildCommand.projectDefaultRequest(
-                    from: fixture.root, updateBuiltOnSuccess: false
+                    from: fixture.root
                 )
                 try Expect.false(result != nil, "configuration may not override project")
+            }
+
+            Step("a legacy build-object.pkl is refused with the way out") {
+                let fixture = try SwiftPackageFixture()
+                defer { fixture.remove() }
+                try "name = \"Legacy\"".write(
+                    to: fixture.root.appendingPathComponent("build-object.pkl"), atomically: true, encoding: .utf8
+                )
+                do {
+                    _ = try SwiftBuildCommand.projectDefaultRequest(from: fixture.root)
+                    try Expect.false(true, "build-object.pkl must not be read by core")
+                } catch ConfigurationFileError.legacy {
+                    try Expect.true(true, "legacy configuration points at sbm modernize")
+                }
             }
         }
     }
@@ -166,13 +115,10 @@ extension ExecutableFlowSuite {
 
 private func fixtureConfig() -> String {
     """
-    uuid = "00000000-0000-0000-0000-000000000001"
-    name = "DiscoveryFixture"
-    types { "binary" }
-    versions { release { major = 1 minor = 0 patch = 0 } }
-    compile { use = true arguments { "--debug" "--local" } }
-    details = ""
-    author = ""
-    update = ""
+    import Executable;
+
+    let package: Package = .{
+        .build = .{ .arguments = ["--debug"] },
+    };
     """
 }
