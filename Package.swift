@@ -13,7 +13,8 @@ let package = Package(
             name: "Executable",
             targets: ["Executable"]
         ),
-        // build-object.pkl: reading it and migrating it to package.frame (`sbm modernize`).
+        // Pkl configuration: build-object.pkl and its migration to package.frame (`sbm modernize`),
+        // and `.sbm/workflows.pkl` behind `sbm wf` / `sbm pkg`.
         .library(
             name: "ExecutableLegacy",
             targets: ["ExecutableLegacy"]
@@ -73,7 +74,6 @@ let package = Package(
                 .product(name: "Path", package: "Path"),
                 .product(name: "Primitives", package: "Primitives"),
                 .product(name: "Version", package: "Version"),
-                .product(name: "Parsers", package: "Parsers"),
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "Roots", package: "Frame"),
                 .product(name: "IO", package: "IO"),
@@ -91,6 +91,7 @@ let package = Package(
                 .product(name: "Version", package: "Version"),
                 .product(name: "Parsers", package: "Parsers"),
                 .product(name: "Arguments", package: "Arguments"),
+                .product(name: "Terminal", package: "Terminal"),
             ]
         ),
     ]

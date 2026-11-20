@@ -1,3 +1,4 @@
+import Executable
 import Foundation
 
 /// Compiles a single package action to the same typed IR as full workspace workflows.

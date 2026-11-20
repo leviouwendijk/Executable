@@ -40,7 +40,7 @@ extension ExecutableFlowSuite {
                     .map {
                         $0.name.rawValue
                     }
-                try Expect.equal(migration, names + ["modernize"], "the migration root adds modernize to core")
+                try Expect.equal(migration, names + ["wf", "pkg", "modernize"], "the migration root adds the Pkl commands to core")
             }
 
             Step("increment parses native typed bump values") {

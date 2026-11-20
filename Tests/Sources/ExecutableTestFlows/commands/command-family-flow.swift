@@ -1,5 +1,6 @@
 import Arguments
 import Executable
+import ExecutableLegacy
 import TestFlows
 
 extension ExecutableFlowSuite {
@@ -54,7 +55,7 @@ extension ExecutableFlowSuite {
                     ["help", "wf"],
                     ["wf", "run", "--help"],
                 ] {
-                    let exit = await SwiftBuildManagerCommand.run(arguments: arguments)
+                    let exit = await SwiftBuildManagerMigrationCommand.run(arguments: arguments)
                     try Expect.equal(
                         exit,
                         Int32(0),

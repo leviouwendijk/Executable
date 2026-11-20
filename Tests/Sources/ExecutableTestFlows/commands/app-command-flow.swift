@@ -28,8 +28,6 @@ extension ExecutableFlowSuite {
                         "build",
                         "test",
                         "bench",
-                        "wf",
-                        "pkg",
                         "docs",
                         "lib",
                         "renew-repositories",

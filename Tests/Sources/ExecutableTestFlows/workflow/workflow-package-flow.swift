@@ -1,5 +1,6 @@
 import Arguments
 import Executable
+import ExecutableLegacy
 import Foundation
 import TestFlows
 
@@ -7,7 +8,7 @@ extension ExecutableFlowSuite {
     static var workflowPackageFlow: TestFlow {
         TestFlow("workflow-package", tags: ["sbm", "package", "workflow", "safety"]) {
             Step("pkg and p resolve the same positional package/action command") {
-                let spec = try SwiftBuildManagerCommand.spec()
+                let spec = try SwiftBuildManagerMigrationCommand.spec()
                 for arguments in [
                     ["pkg", "runtime", "update", "--verify"],
                     ["p", "runtime", "update", "-v"],
@@ -76,17 +77,17 @@ extension ExecutableFlowSuite {
             }
 
             Step("ship CLI requires explicit stage-all permission before any operations") {
-                let exit = await SwiftBuildManagerCommand.run(arguments: ["pkg", "runtime", "ship", "-m", "message"])
+                let exit = await SwiftBuildManagerMigrationCommand.run(arguments: ["pkg", "runtime", "ship", "-m", "message"])
                 try Expect.true(exit != 0, "ship without --stage-all is rejected up front")
             }
 
             Step("package dry-run dispatch succeeds without mutating anything") {
                 let fixture = try SinglePackageFixture(withTests: false)
                 defer { fixture.remove() }
-                let exit = await SwiftBuildManagerCommand.run(arguments: ["p", "runtime", "update", "-v", "--dry-run", "--workspace", fixture.root.path])
+                let exit = await SwiftBuildManagerMigrationCommand.run(arguments: ["p", "runtime", "update", "-v", "--dry-run", "--workspace", fixture.root.path])
                 // --verify demands local test configuration, unlike bare update.
                 try Expect.true(exit != 0, "update --verify without declared tests fails at planning")
-                let safe = await SwiftBuildManagerCommand.run(arguments: ["p", "runtime", "update", "--dry-run", "--workspace", fixture.root.path])
+                let safe = await SwiftBuildManagerMigrationCommand.run(arguments: ["p", "runtime", "update", "--dry-run", "--workspace", fixture.root.path])
                 try Expect.equal(safe, Int32(0), "update dry-run succeeds without SwiftPM mutation")
             }
         }

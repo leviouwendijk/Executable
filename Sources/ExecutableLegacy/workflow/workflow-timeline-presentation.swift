@@ -1,3 +1,4 @@
+import Executable
 import Foundation
 import Terminal
 #if canImport(Darwin)
