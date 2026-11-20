@@ -42,27 +42,7 @@ public struct BuildIdentity: Sendable, Equatable {
     }
 }
 
-/// A product's `<product>.metadata`, deployed or built.
-public struct ProductMetadata: Sendable, Equatable {
-    public let values: [String: String]
-
-    public var version: ObjectVersion? { values["Version"].flatMap(ReleaseTag.version(of:)) }
-    public var commit: String? { values["Commit"].flatMap { $0.isEmpty ? nil : $0 } }
-    public var dirty: Bool { values["Dirty"] == "true" }
-
-    public init(values: [String: String]) {
-        self.values = values
-    }
-
-    public init(parsing text: String) {
-        var values: [String: String] = [:]
-        for line in text.split(whereSeparator: \.isNewline) {
-            guard let separator = line.firstIndex(of: "=") else { continue }
-            values[String(line[..<separator])] = String(line[line.index(after: separator)...])
-        }
-        self.init(values: values)
-    }
-
+extension ProductMetadata {
     /// The metadata of a product in `root` (a deploy directory or a build directory), or nil
     /// when no deploy or build recorded it there.
     public static func read(product: String, in root: URL) throws -> ProductMetadata? {
