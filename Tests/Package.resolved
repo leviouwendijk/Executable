@@ -25,7 +25,7 @@
       "location" : "https://github.com/leviouwendijk/Atomos.git",
       "state" : {
         "branch" : "master",
-        "revision" : "d82fd2ccb56f9fafbb079435c4d70ff5207bfe8c"
+        "revision" : "0dbb0c492669c725aed5f91b965440c7cd4256e3"
       }
     },
     {
@@ -232,7 +232,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "1e381664d669a5769f3e634ddada47ade4305db1"
+        "revision" : "1e9c7defa2037e0b74be9e95d8e987442323d372"
       }
     },
     {
