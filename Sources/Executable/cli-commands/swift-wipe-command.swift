@@ -29,7 +29,7 @@ public enum SwiftWipeAllCommand: BoundArgumentCommand {
     public static let name = "all"
 
     public static func components() throws -> [CommandComponentLowerable] {
-        [about("Delete .build and .index-build of the package and its Tests/ and Benchmarks/ (-r: every package below)."),
+        [about("Delete .build and .index-build of the package and its Tests/ and Benchmarks/ (-r: every package below). Other scopes: sbm wipe main (the package only), sbm wipe extra (Tests/ and Benchmarks/ only), sbm wipe caches (SwiftPM's global cache)."),
          try params(SwiftWipePackageCommand.Options.self)]
     }
 
@@ -121,8 +121,11 @@ public enum SwiftWipePackageCommand {
     }
 
     static func run(_ options: Options, scope: Wipe.Scope) async throws {
+        if options.root == "help" {
+            throw ArgumentValidationError("sbm wipe [all|main|extra|caches] [-r [root]] [-d N] [-n] [-y] [--ignore-keep]; details: sbm wipe <scope> --help")
+        }
         guard options.recursive || (options.root.isEmpty && options.depth == nil) else {
-            throw ArgumentValidationError("A root and --depth apply only with -r.")
+            throw ArgumentValidationError("A root and --depth apply only with -r (sbm wipe --help).")
         }
         let project = try options.project.map {
             URL(fileURLWithPath: $0, isDirectory: true)
