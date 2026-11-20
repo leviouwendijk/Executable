@@ -85,6 +85,24 @@ extension ExecutableFlowSuite {
                 }
             }
 
+            Step("Tests/package.frame before the tests move runs declared products from the root") {
+                let fixture = try SwiftPackageFixture()
+                defer { fixture.remove() }
+                let tests = fixture.root.appendingPathComponent("Tests", isDirectory: true)
+                try FileManager.default.createDirectory(at: tests, withIntermediateDirectories: true)
+                try "import Executable;\n\nlet tests: Tests = .{ .primary = \"fixture-cli\", .groups = .{ .apps = [\"FixtureApp\"] } };\n"
+                    .write(to: tests.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
+
+                let plan = try await Tests.resolve(at: fixture.root)
+                try Expect.equal(plan.runs.map(\.package), [fixture.root], "products run in the root package")
+                try Expect.equal(plan.products, ["fixture-cli"], "the declared primary runs")
+                let all = try await Tests.resolve(at: fixture.root, selection: .all)
+                try Expect.equal(all.products, ["fixture-cli", "FixtureApp"], "only declared products count among the root's executables")
+                let inside = try await Tests.resolve(at: tests)
+                try Expect.equal(inside.runs.map(\.package), [fixture.root], "from inside Tests/ the root package still runs them")
+                try await Tests.execute(plan)
+            }
+
             Step("nested test package runs its only product without a tests declaration") {
                 let fixture = try SwiftPackageFixture()
                 defer { fixture.remove() }

@@ -72,7 +72,13 @@ extension ExecutableFlowSuite {
                 try Expect.equal(version, .init(major: 1, minor: 4, patch: 0), "the untagged version is reported")
                 try Expect.equal(try await fixture.remoteTags(), [], "nothing is pushed")
                 try Expect.true(result.unsplitTests, "tests without a Tests/ package are reported")
-                try Expect.isNil(result.testsFrame, "no Tests/package.frame without a Tests/ package")
+                guard let testsFrame = result.testsFrame, case .tests(let tests) = try PackageFrame.read(testsFrame) else {
+                    throw MigrationFixtureError("Tests/package.frame keeps the declaration before the tests move")
+                }
+                try Expect.equal(tests.primary, "fixture-cli", "the declared primary survives the migration")
+                let plan = try await Tests.resolve(at: fixture.project)
+                try Expect.equal(plan.runs.map(\.package), [fixture.project], "unsplit tests run from the root package")
+                try Expect.equal(plan.products, ["fixture-cli"], "the declared primary is what runs")
             }
 
             Step("discovery finds projects within depth under each root, never in hidden directories") {

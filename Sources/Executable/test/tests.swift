@@ -6,7 +6,8 @@ import IO
 /// Test packages are nested packages directly below a project: a directory with a
 /// Package.swift (depending on the project by path) and a package.frame declaring
 /// `let tests: Tests`. `Tests/` is the conventional one; others (`Benchmarks/`) work the
-/// same way.
+/// same way. Until a project's tests move, `Tests/package.frame` alone (no Package.swift
+/// beside it) declares test products that still live in the project's own package.
 public enum Tests {
     public static let conventionalDirectory = "Tests"
 
@@ -65,13 +66,22 @@ public enum Tests {
         // Run from inside a test package: that package alone.
         if case .tests(let configuration)? = try description(in: project) {
             let parent = project.deletingLastPathComponent()
+            guard try BuildObjectDiscovery.local(named: "Package.swift", in: project) != nil else {
+                return try await unsplitPlan(at: parent, configuration: configuration, selection: selection)
+            }
             let package = TestPackage(directory: project, configuration: configuration)
             return Plan(project: parent, runs: try await runs(of: [package], parent: parent, selection: selection))
         }
 
         let packages = try testPackages(in: project)
-        guard !packages.isEmpty else { try legacyPlan(at: project) }
-        return Plan(project: project, runs: try await runs(of: packages, parent: project, selection: selection))
+        if !packages.isEmpty {
+            return Plan(project: project, runs: try await runs(of: packages, parent: project, selection: selection))
+        }
+        let conventional = project.appendingPathComponent(conventionalDirectory, isDirectory: true)
+        if case .tests(let configuration)? = try description(in: conventional) {
+            return try await unsplitPlan(at: project, configuration: configuration, selection: selection)
+        }
+        try legacyPlan(at: project)
     }
 
     /// Test packages directly below a project, `Tests/` first.
@@ -168,6 +178,18 @@ private extension Tests {
             throw TestConfiguration.ValidationError.undeclaredProduct(name)
         }
         return runs
+    }
+
+    /// `Tests/package.frame` declares the tests, but they have not moved into a `Tests/` package
+    /// yet: the declared products run from the project's own package.
+    static func unsplitPlan(
+        at project: URL,
+        configuration: TestConfiguration,
+        selection: TestConfiguration.Selection
+    ) async throws -> Plan {
+        let available = Set(try await Products.executableNames(in: project))
+        let products = try configuration.selectedProducts(for: selection, availableProducts: available)
+        return Plan(project: project, runs: [Run(package: project, products: products)])
     }
 
     static func legacyPlan(at project: URL) throws -> Never {

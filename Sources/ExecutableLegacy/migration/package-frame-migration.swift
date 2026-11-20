@@ -6,13 +6,13 @@ import Version
 /// Moves a build-object.pkl project to package.frame:
 ///
 /// - `compile { }` becomes `.build` and `.deploy` in `package.frame`;
-/// - `tests { }` becomes `Tests/package.frame` when the project has a `Tests/` package;
+/// - `tests { }` becomes `Tests/package.frame`, also before the tests move into `Tests/`;
 /// - the release version becomes a git tag on HEAD, unless a release tag already exists;
 /// - build-object.pkl and compiled.pkl are removed, and .gitignore drops the compiled.pkl
 ///   rules and ignores `.build/` at any depth.
 ///
 /// Moving test targets into `Tests/` is not part of it; `unsplitTests` reports when the
-/// project still declares tests but has no test package.
+/// test products still live in the root package.
 public enum PackageFrameMigration {
     public enum TagOutcome: Sendable, Equatable {
         case existing(ObjectVersion)
@@ -72,15 +72,15 @@ public enum PackageFrameMigration {
         var testsFrame: URL?
         var unsplitTests = false
         if let tests = legacy.tests {
+            // Written even before the tests move into Tests/: until a Tests/Package.swift exists,
+            // `sbm test` runs these products from the root package, so nothing is lost.
             let testsDirectory = project.appendingPathComponent(Tests.conventionalDirectory, isDirectory: true)
-            if try BuildObjectDiscovery.local(named: "Package.swift", in: testsDirectory) != nil {
+            unsplitTests = try BuildObjectDiscovery.local(named: "Package.swift", in: testsDirectory) == nil
+            if try BuildObjectDiscovery.local(named: PackageFrame.fileName, in: testsDirectory) == nil {
+                try FileManager.default.createDirectory(at: testsDirectory, withIntermediateDirectories: true)
                 let file = testsDirectory.appendingPathComponent(PackageFrame.fileName)
-                if try BuildObjectDiscovery.local(named: PackageFrame.fileName, in: testsDirectory) == nil {
-                    try write(PackageFrame.source(tests), to: file, in: testsDirectory)
-                    testsFrame = file
-                }
-            } else {
-                unsplitTests = true
+                try write(PackageFrame.source(tests), to: file, in: testsDirectory)
+                testsFrame = file
             }
         }
 
@@ -188,14 +188,15 @@ public enum PackageFrameMigration {
     }
 
     static func tagRelease(_ version: ObjectVersion, at project: URL) async throws -> TagOutcome {
-        if let latest = try await ReleaseTags.latest(at: project) {
-            return .existing(latest)
-        }
         do {
+            if let latest = try await ReleaseTags.latest(at: project) {
+                return .existing(latest)
+            }
             try await ReleaseTags.create(version, at: project)
             return .tagged(version)
         } catch {
-            // Dirty, unpushed, already released, or no upstream: migrate anyway, tag by hand later.
+            // Not a repository, dirty, unpushed, already released, or no upstream:
+            // migrate anyway, tag by hand later.
             return .skipped(version, reason: error.localizedDescription)
         }
     }

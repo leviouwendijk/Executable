@@ -113,7 +113,7 @@ public enum SwiftModernizeCommand: BoundArgumentCommand {
             print("  release \(ReleaseTags.name(for: version)) not tagged: \(reason)")
         }
         if result.unsplitTests {
-            print("  tests   still in the root package; move them into Tests/ with its own package.frame")
+            print("  tests   still in the root package; Tests/package.frame declares them until they move into Tests/")
         }
     }
 }
