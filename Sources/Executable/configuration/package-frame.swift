@@ -203,7 +203,7 @@ extension PackageFrame {
             .object([
                 .init("build", .of(BuildFields.self)),
                 .init("deploy", .of(DeployFields.self)),
-                .init("mode", .of(BuildMode.self), summary: "How a flagless `sbm build` builds: .release (default) or .debug."),
+                .init("mode", .of(BuildMode.self), summary: "How `sbm build` builds: .release (default) or .debug; -d/--release override it."),
                 .init("wipe", .of(WipeFields.self)),
                 .init("sign", .of(SignFields.self)),
             ], summary: "How sbm builds and deploys the package beside this file: the `package` binding of package.frame.")
@@ -242,7 +242,7 @@ extension PackageFrame {
                 .init("entitlements", .string, summary: "Entitlements plist, relative to the package."),
                 .init("hardened_runtime", .boolean, summary: "Enable the hardened runtime; false by default."),
                 .init("missing", .of(CodeSigning.MissingIdentity.self)),
-            ], summary: "Code-sign the products a flagless `sbm build` builds. `--sign` replaces this for one run.")
+            ], summary: "Code-sign the products `sbm build` builds. `--sign` replaces this for one run, `--ignore-frame` drops it.")
         }
     }
 
@@ -274,8 +274,8 @@ extension PackageFrame {
 
         static var frameSchema: Frame.Schema {
             .object([
-                .init("arguments", .array(.string), required: true, summary: "sbm build flags a flagless `sbm build` uses."),
-            ], summary: "How a flagless `sbm build` builds.")
+                .init("arguments", .array(.string), required: true, summary: "Raw sbm build flags `sbm build` starts from; prefer typed fields. This run's flags override them per field."),
+            ], summary: "How `sbm build` builds.")
         }
     }
 
@@ -285,8 +285,8 @@ extension PackageFrame {
         static var frameSchema: Frame.Schema {
             .object([
                 .init("products", .array(.string), required: true,
-                      summary: "Executable products a flagless `sbm build` builds and deploys to ~/sbm-bin; at least one."),
-            ], summary: "What a flagless `sbm build` deploys; without it, nothing is deployed.")
+                      summary: "Executable products `sbm build` builds and deploys to the deploy directory; at least one. -l keeps them in .build for one run."),
+            ], summary: "What `sbm build` deploys; without it, nothing is deployed unless --deploy is given.")
         }
     }
 

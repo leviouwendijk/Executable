@@ -14,24 +14,29 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         public var debug: Bool
 
         @Flag(
+            "release",
+            help: "Build in release mode, whatever package.frame's .mode says."
+        )
+        public var release: Bool
+
+        @Flag(
             "local",
             short: "l",
-            help: "Keep artifacts in .build (no deploy)."
+            help: "Keep artifacts in .build: no deploy, even when package.frame's .deploy says to."
         )
         public var local: Bool
 
         @Flag(
-            "repo",
-            short: "r",
-            help: "Keep artifacts in .build (no deploy)."
+            "deploy",
+            help: "Deploy the selected products, even when package.frame has no .deploy (or with --ignore-frame)."
         )
-        public var repo: Bool
+        public var deploy: Bool
 
         @Flag(
-            "no-move",
-            help: "Keep artifacts in .build (no deploy)."
+            "ignore-frame",
+            help: "Build from these flags alone: package.frame is not read, so nothing is signed or deployed unless a flag says so."
         )
-        public var noMove: Bool
+        public var ignoreFrame: Bool
 
         @Opt(
             "project",
@@ -56,7 +61,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         @Opts(
             "products",
             take: .many,
-            help: "Deploy only these executable products (comma-separated or repeatable)."
+            help: "Build only these executable products (comma-separated or repeatable); replaces package.frame's selection. They deploy when --deploy is given, or when package.frame's .deploy lists them all."
         )
         public var products: [String]
 
@@ -158,7 +163,7 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
     public static func components() throws -> [CommandComponentLowerable] {
         [
             about(
-                "Build a Swift package (debug/release) and optionally deploy to '~/sbm-bin/'."
+                "Build a Swift package. Flags override package.frame field by field (mode, products, signing, deploy); --ignore-frame builds from the flags alone. Nothing deploys unless package.frame's .deploy or --deploy says so."
             ),
             try params(
                 Options.self
@@ -201,14 +206,19 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
                 from: directory,
                 approvedAncestorConfiguration: approvedAncestor
             )
-        } else if hasExplicitInput(invocation) {
+        } else if options.ignoreFrame {
             buildRequest = try request(
                 from: options,
+                frame: nil,
                 source: .direct(arguments: auditArguments(from: options))
             )
         } else {
+            let directory = options.project.map {
+                URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            } ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
             buildRequest = try projectDefaultRequest(
-                from: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+                from: directory,
+                overrides: hasExplicitInput(invocation) ? options : nil
             )
         }
 
@@ -233,11 +243,16 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         )
     }
 
+    /// The request for a build in `directory`: its package.frame, with `overrides` (the flags
+    /// of this run) replacing it field by field. Without a package.frame, the flags alone.
     public static func projectDefaultRequest(
         from directory: URL,
-        approvedAncestorConfiguration: URL? = nil
+        approvedAncestorConfiguration: URL? = nil,
+        overrides: Options? = nil
     ) throws -> Build.Request {
         let root = directory.standardizedFileURL
+        let flags = try overrides ?? emptyOptions()
+        let flagSource: Build.Request.Source = .direct(arguments: overrides.map(auditArguments(from:)) ?? [])
         let local = try BuildObjectDiscovery.configuration(in: root)
         let objectURL: URL?
         if let local {
@@ -252,40 +267,32 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             objectURL = nil
         }
 
-        guard let objectURL else {
-            return Build.Request(
-                project: root,
-                config: .init(mode: .release),
-                source: .direct(arguments: [])
-            )
-        }
-
         // Malformed local configuration is an error, not an invitation to search upwards.
-        let package = try packageConfiguration(from: objectURL)
-        guard var arguments = package?.flaglessArguments else {
-            return Build.Request(
-                project: root,
-                config: .init(mode: .release),
-                source: .direct(arguments: [])
-            )
+        guard let objectURL, let package = try packageConfiguration(from: objectURL) else {
+            return try request(from: flags, frame: nil, source: flagSource, defaultProject: root)
         }
 
+        var arguments = package.buildArguments
         if let first = arguments.first?.lowercased(), first == "build" || first == "sbm" {
             arguments.removeFirst()
         }
-        let parsed = try Arguments.parse(arguments, spec: try spec())
-        let options = try parsed.options(Options.self)
-        if let override = options.project {
+        let frameOptions = try Arguments.parse(arguments, spec: try spec()).options(Options.self)
+        if let override = frameOptions.project {
             throw BuildObjectDiscoveryError.configurationOverridesProject(override)
         }
-        if options.inheritAncestor {
+        if frameOptions.inheritAncestor || frameOptions.ignoreFrame {
             throw BuildObjectDiscoveryError.inheritanceOptionsConflict
         }
+
+        let frameArguments = package.flaglessArguments ?? []
+        let source: Build.Request.Source = overrides == nil
+            ? .buildObject(url: objectURL, arguments: frameArguments)
+            : .merged(url: objectURL, frame: frameArguments, flags: flagSource.arguments)
         return try request(
-            from: options,
-            source: .buildObject(url: objectURL, arguments: arguments),
-            defaultProject: root,
-            packageSigning: package?.signing
+            from: flags,
+            frame: .init(package: package, options: frameOptions),
+            source: source,
+            defaultProject: root
         )
     }
 
@@ -318,19 +325,29 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
             Options.self
         )
 
-        return try request(
-            from: options,
-            source: .direct(
-                arguments: arguments
-            ),
-            defaultProject: defaultProject
+        if options.ignoreFrame {
+            return try request(
+                from: options,
+                frame: nil,
+                source: .direct(arguments: arguments),
+                defaultProject: defaultProject
+            )
+        }
+
+        return try projectDefaultRequest(
+            from: options.project.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? defaultProject,
+            overrides: options
         )
+    }
+
+    static func emptyOptions() throws -> Options {
+        try Arguments.parse([], spec: try spec()).options(Options.self)
     }
 }
 
 extension SwiftBuildCommand {
-    /// Whether the invocation overrides package.frame. `-t`/`-b` only add tests and benchmarks
-    /// around the build, so `sbm -t` still builds (and deploys) the way package.frame says.
+    /// Whether the invocation overrides any package.frame field. `-t`/`-b` and the tidy flags only
+    /// add steps around the build, so `sbm -t` builds exactly the way package.frame says.
     @_spi(Testing) public static func hasExplicitInput(
         _ invocation: ParsedInvocation
     ) -> Bool {
@@ -360,25 +377,14 @@ extension SwiftBuildCommand {
             break
 
         case .buildObject(_, let arguments):
-            let quoted = arguments
-                .map(String.init(reflecting:))
-                .joined(separator: " ")
-
-            let effective = arguments
-                .joined(separator: " ")
-
             lines.append(
-                "Detected preconfigured build instructions, intercepting build commands."
-            )
-            lines.append(
-                "    (You provided no overriding flags or options)."
+                "Building as package.frame says\(arguments.isEmpty ? "" : ": " + arguments.joined(separator: " "))."
             )
             lines.append("")
+
+        case .merged(_, let frame, let flags):
             lines.append(
-                "    Arguments found: \(quoted)"
-            )
-            lines.append(
-                "    Invocation (effective): sbm \(effective)"
+                "package.frame\(frame.isEmpty ? "" : " (" + frame.joined(separator: " ") + ")"), overridden by: \(flags.joined(separator: " "))"
             )
             lines.append("")
         }
@@ -413,6 +419,9 @@ extension SwiftBuildCommand {
         lines.append(
             "    products  \(products)"
         )
+        lines.append(
+            "    deploy    \(plan.request.deploy ? plan.request.destination.path : "no (stays in .build)")"
+        )
         if let signing = plan.request.signing.defaultConfiguration {
             var line = "    signing   \(signing.identity.argumentValue)"
             if signing.missing != .fail {
@@ -432,62 +441,72 @@ extension SwiftBuildCommand {
     }
 }
 
+extension SwiftBuildCommand {
+    /// What package.frame contributes to a build: its typed fields and its raw `.build.arguments`.
+    struct FrameLayer {
+        let package: PackageConfiguration
+        let options: Options
+    }
+}
+
 private extension SwiftBuildCommand {
+    /// The request for `flags` over `frame`: each field comes from the flags when they set it,
+    /// otherwise from package.frame (typed field first, then its raw arguments), otherwise the default.
     static func request(
-        from options: Options,
+        from flags: Options,
+        frame: FrameLayer?,
         source: Build.Request.Source,
         defaultProject: URL = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
             isDirectory: true
-        ),
-        packageSigning: PackageSigning? = nil
+        )
     ) throws -> Build.Request {
-        let project = options.project.map {
-            URL(
-                fileURLWithPath: $0,
-                isDirectory: true
-            )
+        let raw = frame?.options
+        let package = frame?.package
+
+        func many(_ flag: [String], _ frame: [String]?) -> [String] {
+            flag.isEmpty ? csvValues(frame ?? []) : csvValues(flag)
+        }
+
+        let project = flags.project.map {
+            URL(fileURLWithPath: $0, isDirectory: true)
         } ?? defaultProject
 
-        let destination = options.destination.map {
-            URL(
-                fileURLWithPath: $0,
-                isDirectory: true
-            )
+        let destination = (flags.destination ?? raw?.destination).map {
+            URL(fileURLWithPath: $0, isDirectory: true)
         } ?? Build.defaultDeploymentDirectory
 
-        let hasSigningOptions =
-            options.signingIdentifier != nil
-            || options.signingEntitlements != nil
-            || options.signingHardenedRuntime
+        guard !(flags.debug && flags.release) else {
+            throw BuildFlagError.conflictingModes
+        }
+        let debug = flags.debug
+            || (!flags.release && (package?.mode == .debug || raw?.debug == true))
 
-        guard options.signingIdentity != nil || !hasSigningOptions else {
-            throw CodeSigningConfigurationError.signingOptionsRequireIdentity
+        let products = flags.products.isEmpty
+            ? (package?.deployProducts ?? csvValues(raw?.products ?? []))
+            : csvValues(flags.products)
+
+        guard !(flags.deploy && flags.local) else {
+            throw BuildFlagError.conflictingDeploy
+        }
+        let deploy: Bool
+        if flags.deploy {
+            deploy = true
+        } else if flags.local {
+            deploy = false
+        } else if let deployProducts = package?.deployProducts {
+            // A flag's product selection deploys only what package.frame would deploy anyway.
+            deploy = Set(products).isSubset(of: deployProducts)
+        } else {
+            deploy = raw?.deploy == true
         }
 
         let signing: Build.Signing
-
-        if let signingIdentity = options.signingIdentity {
-            let selector = try CodeSigning.IdentitySelector(
-                argument: signingIdentity
-            )
-            let entitlements = options.signingEntitlements.map { path in
-                URL(
-                    fileURLWithPath: path,
-                    relativeTo: project
-                )
-                .standardizedFileURL
-            }
-
-            signing = .init(
-                defaultConfiguration: .init(
-                    identity: selector,
-                    identifier: options.signingIdentifier,
-                    entitlements: entitlements,
-                    hardenedRuntime: options.signingHardenedRuntime
-                )
-            )
-        } else if let packageSigning {
+        if flags.signingIdentity != nil || flags.hasSigningModifiers {
+            signing = try commandLineSigning(flags, project: project)
+        } else if let raw, raw.signingIdentity != nil || raw.hasSigningModifiers {
+            signing = try commandLineSigning(raw, project: project)
+        } else if let packageSigning = package?.signing {
             signing = .init(
                 defaultConfiguration: packageSigning.configuration(
                     in: project,
@@ -501,31 +520,51 @@ private extension SwiftBuildCommand {
         return Build.Request(
             project: project,
             config: .init(
-                mode: options.debug ? .debug : .release
+                mode: debug ? .debug : .release
             ),
             destination: destination,
-            deploy: !(options.local || options.repo || options.noMove),
+            deploy: deploy,
             selection: .init(
-                products: Set(
-                    csvValues(options.products)
-                ),
-                legacyTargets: Set(
-                    csvValues(options.legacyTargets)
-                ),
-                skippedProducts: Set(
-                    csvValues(options.skipProducts)
-                ),
-                legacySkippedTargets: Set(
-                    csvValues(options.legacySkipTargets)
-                ),
-                cliOnly: options.cliOnly,
-                keepApps: options.keepApps,
+                products: Set(products),
+                legacyTargets: Set(many(flags.legacyTargets, raw?.legacyTargets)),
+                skippedProducts: Set(many(flags.skipProducts, raw?.skipProducts)),
+                legacySkippedTargets: Set(many(flags.legacySkipTargets, raw?.legacySkipTargets)),
+                cliOnly: flags.cliOnly || raw?.cliOnly == true,
+                keepApps: flags.keepApps || raw?.keepApps == true,
                 destinationMappings: destinationMap(
-                    options.map
+                    flags.map.isEmpty ? (raw?.map ?? []) : flags.map
                 )
             ),
             signing: signing,
             source: source
+        )
+    }
+
+    /// Signing from `--sign` and its modifiers; the modifiers need `--sign`.
+    static func commandLineSigning(
+        _ options: Options,
+        project: URL
+    ) throws -> Build.Signing {
+        guard let signingIdentity = options.signingIdentity else {
+            throw CodeSigningConfigurationError.signingOptionsRequireIdentity
+        }
+        let selector = try CodeSigning.IdentitySelector(
+            argument: signingIdentity
+        )
+        let entitlements = options.signingEntitlements.map { path in
+            URL(
+                fileURLWithPath: path,
+                relativeTo: project
+            )
+            .standardizedFileURL
+        }
+        return .init(
+            defaultConfiguration: .init(
+                identity: selector,
+                identifier: options.signingIdentifier,
+                entitlements: entitlements,
+                hardenedRuntime: options.signingHardenedRuntime
+            )
         )
     }
 
@@ -581,16 +620,20 @@ private extension SwiftBuildCommand {
             arguments.append("--debug")
         }
 
+        if options.release {
+            arguments.append("--release")
+        }
+
         if options.local {
             arguments.append("--local")
         }
 
-        if options.repo {
-            arguments.append("--repo")
+        if options.deploy {
+            arguments.append("--deploy")
         }
 
-        if options.noMove {
-            arguments.append("--no-move")
+        if options.ignoreFrame {
+            arguments.append("--ignore-frame")
         }
 
         if let project = options.project {
@@ -657,5 +700,23 @@ private extension SwiftBuildCommand {
         }
 
         return arguments
+    }
+}
+
+extension SwiftBuildCommand.Options {
+    var hasSigningModifiers: Bool {
+        signingIdentifier != nil || signingEntitlements != nil || signingHardenedRuntime
+    }
+}
+
+public enum BuildFlagError: Error, Sendable, LocalizedError, Equatable {
+    case conflictingModes
+    case conflictingDeploy
+
+    public var errorDescription: String? {
+        switch self {
+        case .conflictingModes: "--debug and --release contradict each other."
+        case .conflictingDeploy: "--deploy and --local contradict each other."
+        }
     }
 }

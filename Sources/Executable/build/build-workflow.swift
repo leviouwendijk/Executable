@@ -1,4 +1,5 @@
 import Foundation
+import Version
 
 public extension Build {
     static func resolve(
@@ -248,9 +249,26 @@ public extension Build {
         }
 
         let identity = await BuildIdentity.current(at: plan.request.project)
+        let records = BuildRecord.directory(
+            project: plan.request.project,
+            mode: plan.request.config.mode
+        )
+        // Where each product's metadata lands: the deploy directory, or its build record.
+        let metadataRoots = plan.selectedProductNames.map { product in
+            (
+                product: product,
+                root: plan.request.deploy
+                    ? plan.perProductDestinations[product] ?? plan.request.destination
+                    : records
+            )
+        }
+        let previousVersions = metadataRoots.map { entry in
+            ((try? ProductMetadata.read(product: entry.product, in: entry.root)) ?? nil)?.version
+        }
 
         // The build succeeded (it throws otherwise): record what it was built from, so a
         // renewal knows whether these products are current, deployed or not.
+        var metadataPaths: [String] = []
         do {
             try BuildRecord.write(
                 products: plan.selectedProductNames,
@@ -258,6 +276,9 @@ public extension Build {
                 mode: plan.request.config.mode,
                 identity: identity
             )
+            metadataPaths += plan.selectedProductNames.map {
+                records.appendingPathComponent("\($0).metadata").path
+            }
         } catch {
             print("Build record not written: \(error.localizedDescription)".ansi(.yellow))
         }
@@ -271,6 +292,17 @@ public extension Build {
                 perProductDestinations: plan.perProductDestinations,
                 identity: identity
             )
+            metadataPaths = metadataRoots.map {
+                $0.root.appendingPathComponent("\($0.product).metadata").path
+            } + metadataPaths
+        }
+
+        if let identity, !plan.selectedProductNames.isEmpty {
+            print("")
+            print(identity.versionLine(previous: previousVersions))
+            for path in metadataPaths {
+                print("    \(path)".ansi(.brightBlack))
+            }
         }
 
         var signingResults: [ProductSigningResult] = []

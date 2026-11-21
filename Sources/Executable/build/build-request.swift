@@ -6,6 +6,8 @@ public extension Build {
         public enum Source: Sendable {
             case direct(arguments: [String])
             case buildObject(url: URL, arguments: [String])
+            /// package.frame with this run's flags over it, field by field.
+            case merged(url: URL, frame: [String], flags: [String])
 
             public var arguments: [String] {
                 switch self {
@@ -14,6 +16,9 @@ public extension Build {
 
                 case .buildObject(_, let arguments):
                     return arguments
+
+                case .merged(_, let frame, let flags):
+                    return frame + flags
                 }
             }
 
@@ -24,6 +29,9 @@ public extension Build {
 
                 case .buildObject(let url, _):
                     return url.lastPathComponent
+
+                case .merged(let url, _, _):
+                    return "\(url.lastPathComponent) + flags"
                 }
             }
         }

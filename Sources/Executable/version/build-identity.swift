@@ -33,6 +33,16 @@ public struct BuildIdentity: Sendable, Equatable {
         )
     }
 
+    /// `compiled version += 1.4.0` when the version differs from what the products' metadata
+    /// held before this build (or there was none), `compiled version == 1.4.0` when it does not.
+    public func versionLine(previous: [ObjectVersion?]) -> String {
+        guard let version else { return "compiled version: untagged (\(commit.prefix(7)))" }
+        let name = ReleaseTag.name(for: version)
+        return previous.allSatisfy { $0 == version }
+            ? "compiled version == \(name)"
+            : "compiled version += \(name)"
+    }
+
     var metadataLines: [String] {
         [
             "Version=\(version.map(ReleaseTag.name(for:)) ?? "")",

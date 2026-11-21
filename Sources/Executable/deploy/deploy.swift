@@ -315,15 +315,5 @@ public enum Deploy {
             atomically: true,
             encoding: .utf8
         )
-
-        print(
-            "Metadata written: ".ansi(
-                .brightBlack
-            )
-            + metadataURL.path.ansi(
-                .brightBlack,
-                .bold
-            )
-        )
     }
 }

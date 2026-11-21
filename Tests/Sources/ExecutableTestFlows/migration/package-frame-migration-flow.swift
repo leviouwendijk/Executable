@@ -123,7 +123,7 @@ extension ExecutableFlowSuite {
                 try Expect.isNil(localResult.package.deployProducts, "--local means nothing is deployed")
                 try Expect.equal(
                     localResult.package.flaglessArguments,
-                    ["--debug", "--products", "fixture-cli", "--no-move"],
+                    ["--debug", "--products", "fixture-cli"],
                     "a flagless build still builds the same products locally"
                 )
 

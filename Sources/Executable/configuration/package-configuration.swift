@@ -7,15 +7,15 @@ import Foundation
 ///         .deploy = .{ .products = ["unifi"] },
 ///     };
 public struct PackageConfiguration: Sendable, Equatable {
-    /// sbm build flags a flagless `sbm build` uses.
+    /// Raw sbm build flags `sbm build` starts from; this run's flags override them per field.
     public let buildArguments: [String]
-    /// Executable products a flagless `sbm build` builds and deploys; nil without a `.deploy` clause.
+    /// Executable products `sbm build` builds and deploys (unless `-l`); nil without a `.deploy` clause.
     public let deployProducts: [String]?
     /// Release when nil.
     public let mode: BuildMode?
     /// Wipe the caches after a build when they exceed a size.
     public let wipe: WipePolicy?
-    /// How a flagless `sbm build` signs the products it builds; nil leaves them unsigned.
+    /// How `sbm build` signs the products it builds (unless `--sign` or `--ignore-frame`); nil leaves them unsigned.
     public let signing: PackageSigning?
 
     public init(
@@ -32,7 +32,7 @@ public struct PackageConfiguration: Sendable, Equatable {
         self.signing = signing
     }
 
-    /// Products a flagless `sbm build` builds without deploying them: the `--products` in
+    /// Products a plain `sbm build` builds without deploying them: the `--products` in
     /// `.build.arguments` of a package without `.deploy` (an app that runs from its own `.app`).
     public var localProducts: [String] {
         guard deployProducts == nil else { return [] }
@@ -51,14 +51,17 @@ public struct PackageConfiguration: Sendable, Equatable {
         return products
     }
 
-    /// The flags a flagless `sbm build` runs with, or nil for a plain release build without deploy.
+    /// package.frame as sbm flags, for showing what a build does; nil for a plain release build.
+    /// Deploying follows `.deploy`, not these.
     public var flaglessArguments: [String]? {
-        let arguments = (mode == .debug ? ["--debug"] : []) + buildArguments
+        var arguments = (mode == .debug ? ["--debug"] : []) + buildArguments
         if let deployProducts {
-            return arguments + ["--products"] + deployProducts
+            arguments += ["--products"] + deployProducts + ["--deploy"]
         }
-        guard !arguments.isEmpty || signing != nil else { return nil }
-        return arguments + ["--no-move"]
+        if let signing {
+            arguments += ["--sign", signing.identity.argumentValue]
+        }
+        return arguments.isEmpty ? nil : arguments
     }
 }
 

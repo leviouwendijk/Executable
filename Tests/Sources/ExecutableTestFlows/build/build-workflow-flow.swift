@@ -106,7 +106,6 @@ extension ExecutableFlowSuite {
                             "--debug",
                             "--products",
                             "fixture-cli",
-                            "--no-move",
                         ],
                         "build request retains package.frame audit arguments"
                     )

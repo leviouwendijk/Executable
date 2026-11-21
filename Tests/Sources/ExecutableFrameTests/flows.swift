@@ -3,6 +3,7 @@ import Executable
 import Frame
 import Roots
 import Testing
+import Version
 
 enum ExecutableFrameTests {
     static let binary = """
@@ -40,7 +41,7 @@ enum ExecutableFrameTests {
             try Expect.equal(package.deployProducts, ["unifi", "unifi_agent"], "deployed products")
             try Expect.equal(
                 package.flaglessArguments,
-                ["--skip-products", "unifi_debug", "--products", "unifi", "unifi_agent"],
+                ["--skip-products", "unifi_debug", "--products", "unifi", "unifi_agent", "--deploy"],
                 "a flagless build builds and deploys the listed products"
             )
         }
@@ -51,7 +52,7 @@ enum ExecutableFrameTests {
             }
             try Expect.isNil(package.flaglessArguments, "no clauses means a plain release build")
             let local = PackageConfiguration(buildArguments: ["--skip-products", "x"])
-            try Expect.equal(local.flaglessArguments, ["--skip-products", "x", "--no-move"], "no .deploy keeps the build local")
+            try Expect.equal(local.flaglessArguments, ["--skip-products", "x"], "no .deploy keeps the build local")
         }
 
         Test("a test package declares its primary, groups, interactive and live products") {
@@ -88,11 +89,11 @@ enum ExecutableFrameTests {
             guard case .package(let debug) = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .mode = .debug };\n") else {
                 throw ExpectationError("a package with a mode")
             }
-            try Expect.equal(debug.flaglessArguments, ["--debug", "--no-move"], ".debug builds locally in debug")
+            try Expect.equal(debug.flaglessArguments, ["--debug"], ".debug builds locally in debug")
             guard case .package(let deployed) = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .mode = .debug, .deploy = .{ .products = [\"gm\"] } };\n") else {
                 throw ExpectationError("a deployed package with a mode")
             }
-            try Expect.equal(deployed.flaglessArguments, ["--debug", "--products", "gm"], ".debug still deploys what .deploy names")
+            try Expect.equal(deployed.flaglessArguments, ["--debug", "--products", "gm", "--deploy"], ".debug still deploys what .deploy names")
             guard case .package(let plain) = try PackageFrame.parse(library) else {
                 throw ExpectationError("library")
             }
@@ -155,7 +156,7 @@ enum ExecutableFrameTests {
             try Expect.equal(signing.identifier, "com.example.tool", "identifier")
             try Expect.equal(signing.missing, .adHoc, "missing policy")
             try Expect.false(signing.hardenedRuntime, "hardened runtime is off by default")
-            try Expect.equal(package.flaglessArguments, ["--products", "tool"], "signing adds no flags")
+            try Expect.equal(package.flaglessArguments, ["--products", "tool", "--deploy", "--sign", "apple-development"], "shown as the equivalent flags")
             try Expect.equal(try PackageFrame.parse(PackageFrame.source(package)), .package(package), "signed package round-trips")
             try Expect.true(try PackageFrame.source(package).contains(".identity = .apple_development"), "written as a member")
 
@@ -171,7 +172,7 @@ enum ExecutableFrameTests {
                 throw ExpectationError("a package signed by fingerprint")
             }
             try Expect.equal(defaulted.signing?.missing, .fail, "a missing identity fails by default")
-            try Expect.equal(defaulted.flaglessArguments, ["--no-move"], "signing alone builds locally")
+            try Expect.equal(defaulted.flaglessArguments, ["--sign", "fingerprint:0123456789ABCDEF0123456789ABCDEF01234567"], "signing alone builds locally")
             try Expect.equal(try PackageFrame.parse(PackageFrame.source(defaulted)), .package(defaulted), "fingerprint round-trips")
 
             try Expect.throwsError("an unknown identity") {
@@ -199,6 +200,66 @@ enum ExecutableFrameTests {
             try Expect.equal(signing.identifier, "com.example.tool", "identifier from package.frame")
             try Expect.equal(signing.missing, .skip, "policy from package.frame")
             try Expect.true(request.deploy, "and still deploys")
+        }
+
+        Test("flags override package.frame field by field; --ignore-frame drops it") {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("frame-merge-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let frame = root.appendingPathComponent("package.frame")
+            try "import Executable;\n\nlet package: Package = .{ .sign = .{ .identity = .apple_development, .identifier = \"com.example.tool\", .missing = .skip }, .deploy = .{ .products = [\"tool\"] } };\n"
+                .write(to: frame, atomically: true, encoding: .utf8)
+            func build(_ arguments: String...) throws -> Build.Request {
+                try SwiftBuildCommand.request(arguments: arguments, defaultProject: root)
+            }
+
+            let debug = try build("-d")
+            try Expect.equal(debug.config.buildDirComponent, "debug", "-d sets the mode")
+            try Expect.equal(debug.selection.products, ["tool"], "the frame's products stay")
+            try Expect.equal(debug.signing.defaultConfiguration?.identifier, "com.example.tool", "signing stays")
+            try Expect.true(debug.deploy, "the frame's deploy stays")
+            guard case .merged(let url, _, let flags) = debug.source else {
+                throw ExpectationError("a merged build says so")
+            }
+            try Expect.equal(url.lastPathComponent, "package.frame", "merged with package.frame")
+            try Expect.equal(flags, ["--debug"], "and the flags")
+
+            let local = try build("-l")
+            try Expect.false(local.deploy, "-l skips the deploy")
+            try Expect.notNil(local.signing.defaultConfiguration, "and still signs")
+
+            try Expect.equal(try build("--sign", "ad-hoc").signing.defaultConfiguration?.identity, .adHoc, "--sign replaces the identity")
+            try Expect.false(try build("--products", "other").deploy, "a product outside .deploy builds locally")
+            try Expect.true(try build("--products", "other", "--deploy").deploy, "unless --deploy")
+
+            let bare = try build("--ignore-frame", "-d")
+            try Expect.isNil(bare.signing.defaultConfiguration, "--ignore-frame: no signing")
+            try Expect.false(bare.deploy, "--ignore-frame: no deploy")
+            try Expect.equal(bare.selection.products, [], "--ignore-frame: no product selection")
+            try Expect.true(try build("--ignore-frame", "--deploy").deploy, "--ignore-frame --deploy deploys")
+
+            try Expect.throwsError("-d and --release") { _ = try build("-d", "--release") }
+            try Expect.throwsError("--deploy and -l") { _ = try build("--deploy", "-l") }
+
+            try "import Executable;\n\nlet package: Package = .{ .mode = .debug };\n"
+                .write(to: frame, atomically: true, encoding: .utf8)
+            try Expect.false(try build("--products", "x").deploy, "without .deploy, flags don't deploy")
+            try Expect.equal(try build("--release").config.buildDirComponent, "release", "--release overrides .mode")
+            try Expect.equal(try build("--products", "x").config.buildDirComponent, "debug", "other flags keep .mode")
+        }
+
+        Test("the compiled version line says whether the version moved") {
+            let next = ObjectVersion(major: 1, minor: 4, patch: 0)
+            let identity = BuildIdentity(version: next, commit: "0123456789abcdef", dirty: false)
+            try Expect.equal(identity.versionLine(previous: [nil]), "compiled version += 1.4.0", "first build")
+            try Expect.equal(identity.versionLine(previous: [ObjectVersion(major: 1, minor: 3, patch: 2)]), "compiled version += 1.4.0", "a new release")
+            try Expect.equal(identity.versionLine(previous: [next, next]), "compiled version == 1.4.0", "the same release")
+            try Expect.equal(identity.versionLine(previous: [next, nil]), "compiled version += 1.4.0", "any product behind")
+            try Expect.equal(
+                BuildIdentity(version: nil, commit: "0123456789abcdef", dirty: true).versionLine(previous: []),
+                "compiled version: untagged (0123456)", "before the first release"
+            )
         }
 
         Test("settings.frame can name this machine's signing identity") {

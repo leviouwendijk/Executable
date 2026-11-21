@@ -107,7 +107,7 @@ extension ExecutableFlowSuite {
                 try Expect.false(SwiftBuildCommand.hasExplicitInput(bare), "-t/-b/--bench keep the package.frame build")
 
                 let debug = try Arguments.parse(["build", "-t", "-d"], spec: spec)
-                try Expect.true(SwiftBuildCommand.hasExplicitInput(debug), "a build flag still overrides package.frame")
+                try Expect.true(SwiftBuildCommand.hasExplicitInput(debug), "a build flag overrides package.frame field by field")
 
                 let pack = try Arguments.parse(["pack", "-b", "-t", "--bench"], spec: spec)
                 try Expect.equal(pack.commandPath.map(\.rawValue), ["sbm", "pack", "get"], "pack flags reach pack get")
