@@ -261,7 +261,8 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         }
 
         // Malformed local configuration is an error, not an invitation to search upwards.
-        guard var arguments = try flaglessArguments(from: objectURL) else {
+        let package = try packageConfiguration(from: objectURL)
+        guard var arguments = package?.flaglessArguments else {
             return Build.Request(
                 project: root,
                 config: .init(mode: .release),
@@ -283,18 +284,19 @@ public enum SwiftBuildCommand: BoundArgumentCommand {
         return try request(
             from: options,
             source: .buildObject(url: objectURL, arguments: arguments),
-            defaultProject: root
+            defaultProject: root,
+            packageSigning: package?.signing
         )
     }
 
-    /// The flags a flagless `sbm build` uses, or nil for a plain release build without deploy.
-    /// A test package's package.frame builds plainly.
-    static func flaglessArguments(from configuration: URL) throws -> [String]? {
+    /// The `package` binding of a package.frame; nil for a test or benchmark package, which
+    /// builds plainly.
+    static func packageConfiguration(from configuration: URL) throws -> PackageConfiguration? {
         guard configuration.lastPathComponent == PackageFrame.fileName else {
             throw ConfigurationFileError.legacy(configuration)
         }
         guard case .package(let package) = try PackageFrame.read(configuration) else { return nil }
-        return package.flaglessArguments
+        return package
     }
 
     public static func request(
@@ -411,6 +413,13 @@ extension SwiftBuildCommand {
         lines.append(
             "    products  \(products)"
         )
+        if let signing = plan.request.signing.defaultConfiguration {
+            var line = "    signing   \(signing.identity.argumentValue)"
+            if signing.missing != .fail {
+                line += " (when missing: \(signing.missing == .adHoc ? "ad-hoc" : "unsigned"))"
+            }
+            lines.append(line)
+        }
         lines.append(
             "    project   \(plan.request.project.path)"
         )
@@ -430,7 +439,8 @@ private extension SwiftBuildCommand {
         defaultProject: URL = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
             isDirectory: true
-        )
+        ),
+        packageSigning: PackageSigning? = nil
     ) throws -> Build.Request {
         let project = options.project.map {
             URL(
@@ -475,6 +485,13 @@ private extension SwiftBuildCommand {
                     identifier: options.signingIdentifier,
                     entitlements: entitlements,
                     hardenedRuntime: options.signingHardenedRuntime
+                )
+            )
+        } else if let packageSigning {
+            signing = .init(
+                defaultConfiguration: packageSigning.configuration(
+                    in: project,
+                    machineIdentity: SbmSettings.resolved.signIdentity
                 )
             )
         } else {

@@ -203,9 +203,17 @@ public extension Build {
                 continue
             }
 
-            let signer = try await CodeSigning.resolve(
-                configuration.identity
-            )
+            let signer: CodeSigning.Signer
+            switch try await CodeSigning.resolve(configuration) {
+            case .sign(let resolved):
+                signer = resolved
+
+            case .fallback(let fallback, let reason):
+                let action = fallback == nil ? "Leaving \(product.name) unsigned" : "Signing \(product.name) ad-hoc"
+                print("warning: \(reason) \(action) (.sign.missing = .\(configuration.missing.rawValue)).".ansi(.yellow))
+                guard let fallback else { continue }
+                signer = fallback
+            }
             let target = plan.request.project
                 .standardizedFileURL
                 .appendingPathComponent(

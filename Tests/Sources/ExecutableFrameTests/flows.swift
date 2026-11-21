@@ -133,6 +133,93 @@ enum ExecutableFrameTests {
             }
         }
 
+        Test("sign: a typed identity with a policy for machines that lack it") {
+            let source = """
+                import Executable;
+
+                let package: Package = .{
+                    .sign = .{
+                        .identity = .apple_development,
+                        .identifier = "com.example.tool",
+                        .entitlements = "Resources/tool.entitlements",
+                        .missing = .ad_hoc,
+                    },
+                    .deploy = .{ .products = ["tool"] },
+                };
+                """
+            guard case .package(let package) = try PackageFrame.parse(source) else {
+                throw ExpectationError("a signed package")
+            }
+            let signing = try Expect.notNil(package.signing, "the package signs")
+            try Expect.equal(signing.identity, .kind(.appleDevelopment), "a member names the identity kind")
+            try Expect.equal(signing.identifier, "com.example.tool", "identifier")
+            try Expect.equal(signing.missing, .adHoc, "missing policy")
+            try Expect.false(signing.hardenedRuntime, "hardened runtime is off by default")
+            try Expect.equal(package.flaglessArguments, ["--products", "tool"], "signing adds no flags")
+            try Expect.equal(try PackageFrame.parse(PackageFrame.source(package)), .package(package), "signed package round-trips")
+            try Expect.true(try PackageFrame.source(package).contains(".identity = .apple_development"), "written as a member")
+
+            let project = URL(fileURLWithPath: "/tmp/tool", isDirectory: true)
+            let configuration = signing.configuration(in: project, machineIdentity: .fingerprint("ABC"))
+            try Expect.equal(configuration.identity, .fingerprint("ABC"), "this machine's identity replaces the package's")
+            try Expect.equal(configuration.entitlements?.path, "/tmp/tool/Resources/tool.entitlements", "entitlements resolve from the package")
+            try Expect.equal(configuration.missing, .adHoc, "the policy is kept")
+
+            guard case .package(let defaulted) = try PackageFrame.parse(
+                "import Executable;\n\nlet package: Package = .{ .sign = .{ .identity = \"fingerprint:0123456789ABCDEF0123456789ABCDEF01234567\" } };\n"
+            ) else {
+                throw ExpectationError("a package signed by fingerprint")
+            }
+            try Expect.equal(defaulted.signing?.missing, .fail, "a missing identity fails by default")
+            try Expect.equal(defaulted.flaglessArguments, ["--no-move"], "signing alone builds locally")
+            try Expect.equal(try PackageFrame.parse(PackageFrame.source(defaulted)), .package(defaulted), "fingerprint round-trips")
+
+            try Expect.throwsError("an unknown identity") {
+                _ = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .sign = .{ .identity = .someone } };\n")
+            }
+            try Expect.throwsError("an unknown missing policy") {
+                _ = try PackageFrame.parse("import Executable;\n\nlet package: Package = .{ .sign = .{ .identity = .ad_hoc, .missing = .maybe } };\n")
+            }
+            try Expect.throwsError("signing twice") {
+                _ = try PackageFrame.parse(
+                    "import Executable;\n\nlet package: Package = .{ .build = .{ .arguments = [\"--sign\", \"ad-hoc\"] }, .sign = .{ .identity = .ad_hoc } };\n"
+                )
+            }
+        }
+
+        Test("a flagless build signs as package.frame says") {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("frame-sign-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            try "import Executable;\n\nlet package: Package = .{ .sign = .{ .identity = .apple_development, .identifier = \"com.example.tool\", .missing = .skip }, .deploy = .{ .products = [\"tool\"] } };\n"
+                .write(to: root.appendingPathComponent("package.frame"), atomically: true, encoding: .utf8)
+            let request = try SwiftBuildCommand.projectDefaultRequest(from: root)
+            let signing = try Expect.notNil(request.signing.defaultConfiguration, "the request signs")
+            try Expect.equal(signing.identifier, "com.example.tool", "identifier from package.frame")
+            try Expect.equal(signing.missing, .skip, "policy from package.frame")
+            try Expect.true(request.deploy, "and still deploys")
+        }
+
+        Test("settings.frame can name this machine's signing identity") {
+            let home = FileManager.default.temporaryDirectory
+                .appendingPathComponent("sbm-settings-sign-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: home) }
+            let roots = Roots.load(file: home.appendingPathComponent(".config/roots.frame"), home: home)
+            try Expect.isNil(try SbmSettings.load(roots: roots).signIdentity, "none without a file")
+
+            let directory = home.appendingPathComponent(".config/sbm", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try "import Executable;\n\nlet settings: Settings = .{ .sign = .{ .identity = .ad_hoc } };\n"
+                .write(to: directory.appendingPathComponent("settings.frame"), atomically: true, encoding: .utf8)
+            let settings = try SbmSettings.load(roots: roots)
+            try Expect.equal(settings.signIdentity, .adHoc, "the machine's identity")
+            try Expect.isNil(settings.deploy, "the deploy default is untouched")
+            try Expect.throwsError("an unknown identity") {
+                _ = try SbmSettings.parse("import Executable;\n\nlet settings: Settings = .{ .sign = .{ .identity = .nobody } };\n")
+            }
+        }
+
         Test("written package.frame reads back the same") {
             let package = PackageConfiguration(buildArguments: ["--skip-products", "x"], deployProducts: ["gm"])
             try Expect.equal(try PackageFrame.parse(PackageFrame.source(package)), .package(package), "package round-trips")
@@ -221,6 +308,10 @@ enum ExecutableFrameTests {
                 ("tests", tests),
                 ("written package", try PackageFrame.source(PackageConfiguration(buildArguments: ["-d"], deployProducts: ["gm"]))),
                 ("written tests", try PackageFrame.source(TestConfiguration(primary: "t_a", interactive: ["t_b"], live: ["t_c"]))),
+                ("written signed package", try PackageFrame.source(PackageConfiguration(
+                    deployProducts: ["agentic"],
+                    signing: .init(identity: .kind(.appleDevelopment), identifier: "com.example.agentic", hardenedRuntime: true, missing: .adHoc)
+                ))),
             ] {
                 try Expect.equal(
                     Frame.problems(in: try Frame.parse(source), environment: loaded.environment).map(\.message), [],

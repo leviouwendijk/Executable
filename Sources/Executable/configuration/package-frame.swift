@@ -133,7 +133,8 @@ public enum PackageFrame {
             build: package.buildArguments.isEmpty ? nil : .init(arguments: package.buildArguments),
             deploy: package.deployProducts.map { .init(products: $0) },
             mode: package.mode,
-            wipe: package.wipe.map { .init(above: $0.above) }
+            wipe: package.wipe.map { .init(above: $0.above) },
+            sign: package.signing.map(SignFields.init)
         ))
     }
 
@@ -169,8 +170,13 @@ public enum PackageFrame {
         if let deploy = fields.deploy, deploy.products.isEmpty {
             throw PackageFrameError.empty_deploy
         }
-        return .init(buildArguments: fields.build?.arguments ?? [], deployProducts: fields.deploy?.products, mode: fields.mode,
-                     wipe: fields.wipe.map { .init(above: $0.above) })
+        let arguments = fields.build?.arguments ?? []
+        if fields.sign != nil, arguments.contains(where: { $0.hasPrefix("--sign") }) {
+            throw PackageFrameError.sign_twice
+        }
+        return .init(buildArguments: arguments, deployProducts: fields.deploy?.products, mode: fields.mode,
+                     wipe: fields.wipe.map { .init(above: $0.above) },
+                     signing: try fields.sign.map { try $0.signing() })
     }
 
     private static func configuration(_ fields: TestsFields) -> TestConfiguration {
@@ -191,6 +197,7 @@ extension PackageFrame {
         let deploy: DeployFields?
         let mode: BuildMode?
         let wipe: WipeFields?
+        let sign: SignFields?
 
         static var frameSchema: Frame.Schema {
             .object([
@@ -198,7 +205,67 @@ extension PackageFrame {
                 .init("deploy", .of(DeployFields.self)),
                 .init("mode", .of(BuildMode.self), summary: "How a flagless `sbm build` builds: .release (default) or .debug."),
                 .init("wipe", .of(WipeFields.self)),
+                .init("sign", .of(SignFields.self)),
             ], summary: "How sbm builds and deploys the package beside this file: the `package` binding of package.frame.")
+        }
+    }
+
+    struct SignFields: Codable, Sendable, FrameDescribable {
+        let identity: IdentityField
+        let identifier: String?
+        let entitlements: String?
+        let hardened_runtime: Bool?
+        let missing: CodeSigning.MissingIdentity?
+
+        init(_ signing: PackageSigning) {
+            identity = .init(signing.identity)
+            identifier = signing.identifier
+            entitlements = signing.entitlements
+            hardened_runtime = signing.hardenedRuntime ? true : nil
+            missing = signing.missing == .fail ? nil : signing.missing
+        }
+
+        func signing() throws -> PackageSigning {
+            .init(
+                identity: try CodeSigning.IdentitySelector(argument: identity.value),
+                identifier: identifier,
+                entitlements: entitlements,
+                hardenedRuntime: hardened_runtime ?? false,
+                missing: missing ?? .fail
+            )
+        }
+
+        static var frameSchema: Frame.Schema {
+            .object([
+                .init("identity", .init(.any, summary: "The identity to sign with: .ad_hoc, .apple_development, .developer_id_application, .apple_distribution, or \"fingerprint:<SHA1>\". A machine's settings.frame `.sign.identity` replaces it."), required: true),
+                .init("identifier", .string, summary: "The code-signing identifier, e.g. \"com.example.tool\"."),
+                .init("entitlements", .string, summary: "Entitlements plist, relative to the package."),
+                .init("hardened_runtime", .boolean, summary: "Enable the hardened runtime; false by default."),
+                .init("missing", .of(CodeSigning.MissingIdentity.self)),
+            ], summary: "Code-sign the products a flagless `sbm build` builds. `--sign` replaces this for one run.")
+        }
+    }
+
+    /// An identity selector as written: a member (`.apple_development`) or a string
+    /// (`"fingerprint:<SHA1>"`). Decoded as a string, written as a member where it can be.
+    struct IdentityField: Codable, Sendable {
+        let value: String
+
+        init(_ selector: CodeSigning.IdentitySelector) {
+            switch selector {
+            case .adHoc: value = "ad_hoc"
+            case .kind(let kind): value = kind.rawValue
+            case .fingerprint(let fingerprint): value = "fingerprint:\(fingerprint)"
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            value = try decoder.singleValueContainer().decode(String.self)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(Frame.Name(value))
         }
     }
 
@@ -280,9 +347,11 @@ public enum PackageFrameError: Error, Sendable, LocalizedError {
     case empty_deploy
     case not_a_package(URL)
     case not_tests(URL)
+    case sign_twice
 
     public var errorDescription: String? {
         switch self {
+        case .sign_twice: return "package.frame signs twice: drop the --sign flags from .build.arguments and keep .sign."
         case .missing_binding: return "package.frame must declare `let package: Package`, `let tests: Tests` or `let benchmarks: Benchmarks`."
         case .both_bindings: return "package.frame declares more than one of `package`, `tests` and `benchmarks`; a package is one of them."
         case .empty_deploy: return "package.frame .deploy.products must name at least one product."

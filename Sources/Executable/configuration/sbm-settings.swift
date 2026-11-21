@@ -8,10 +8,15 @@ import Roots
 ///
 ///     import Executable;
 ///
-///     let settings: Settings = .{ .deploy = "~/sbm-bin" };
+///     let settings: Settings = .{
+///         .deploy = "~/sbm-bin",
+///         .sign = .{ .identity = "fingerprint:<SHA1>" },
+///     };
 ///
 /// `.deploy` is where builds deploy to and where deployed products and their metadata are
-/// read from; without a settings file it is `~/sbm-bin`.
+/// read from; without a settings file it is `~/sbm-bin`. `.sign.identity` is the identity this
+/// machine signs with, in place of the one a package.frame `.sign` names.
+/// Each field comes from the first root (home first) that sets it.
 public struct SbmSettings: Sendable, Equatable {
     public static let location = RootLocation.config("sbm")
     public static let fileName = "settings.frame"
@@ -19,11 +24,14 @@ public struct SbmSettings: Sendable, Equatable {
 
     /// As written in the file; nil means the default.
     public let deploy: String?
-    /// The file it came from; nil when no root has one.
+    /// This machine's signing identity; nil keeps the package's.
+    public let signIdentity: CodeSigning.IdentitySelector?
+    /// The first file that set a field; nil when no root has one.
     public let source: URL?
 
-    public init(deploy: String? = nil, source: URL? = nil) {
+    public init(deploy: String? = nil, signIdentity: CodeSigning.IdentitySelector? = nil, source: URL? = nil) {
         self.deploy = deploy
+        self.signIdentity = signIdentity
         self.source = source
     }
 
@@ -39,15 +47,21 @@ public struct SbmSettings: Sendable, Equatable {
         return home.appendingPathComponent(path, isDirectory: true)
     }
 
-    /// The first settings file in the roots (home first) that sets `.deploy`.
+    /// Each field from the first settings file in the roots (home first) that sets it.
     public static func load(roots: RootSet = Roots.load()) throws -> SbmSettings {
+        var deploy: String?
+        var signIdentity: CodeSigning.IdentitySelector?
+        var source: URL?
         for (_, directory) in roots.existing(location) {
             let file = directory.appendingPathComponent(fileName)
             guard FileSystem.default.exists(file) else { continue }
             let settings = try parse(TextFileReader(file).read().text, source: file)
-            if settings.deploy != nil { return settings }
+            if settings.deploy != nil || settings.signIdentity != nil { source = source ?? file }
+            deploy = deploy ?? settings.deploy
+            signIdentity = signIdentity ?? settings.signIdentity
+            if deploy != nil, signIdentity != nil { break }
         }
-        return SbmSettings()
+        return SbmSettings(deploy: deploy, signIdentity: signIdentity, source: source)
     }
 
     public static func parse(_ source: String, source file: URL? = nil) throws -> SbmSettings {
@@ -56,7 +70,11 @@ public struct SbmSettings: Sendable, Equatable {
             throw SbmSettingsError.missing_binding
         }
         let fields = try document.decode(Fields.self, binding: "settings")
-        return SbmSettings(deploy: fields.deploy, source: file)
+        return SbmSettings(
+            deploy: fields.deploy,
+            signIdentity: try fields.sign.map { try CodeSigning.IdentitySelector(argument: $0.identity.value) },
+            source: file
+        )
     }
 
     /// What the commands use: the settings file, or the defaults when it is missing or broken
@@ -65,18 +83,30 @@ public struct SbmSettings: Sendable, Equatable {
         do {
             return try load()
         } catch {
-            fputs("warning: \(location)/\(fileName): \(error.localizedDescription); deploying to \(defaultDeploy)\n", stderr)
+            fputs("warning: \(location)/\(fileName): \(error.localizedDescription); using the defaults (deploy to \(defaultDeploy), the package's signing identity)\n", stderr)
             return SbmSettings()
         }
     }
 
     struct Fields: Codable, Sendable, FrameDescribable {
         let deploy: String?
+        let sign: SignFields?
 
         static var frameSchema: Frame.Schema {
             .object([
                 .init("deploy", .string, summary: "Where builds deploy to and deployed products are read from; ~/sbm-bin by default. ~ and home-relative paths are expanded."),
+                .init("sign", .of(SignFields.self)),
             ], summary: "sbm's settings for this machine: the `settings` binding of .config/sbm/settings.frame.")
+        }
+    }
+
+    struct SignFields: Codable, Sendable, FrameDescribable {
+        let identity: PackageFrame.IdentityField
+
+        static var frameSchema: Frame.Schema {
+            .object([
+                .init("identity", .init(.any, summary: "The identity this machine signs with: .ad_hoc, .apple_development, .developer_id_application, .apple_distribution, or \"fingerprint:<SHA1>\"."), required: true),
+            ], summary: "How this machine signs packages whose package.frame has `.sign`: its identity replaces the package's.")
         }
     }
 }

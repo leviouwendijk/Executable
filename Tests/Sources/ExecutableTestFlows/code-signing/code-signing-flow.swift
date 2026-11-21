@@ -71,6 +71,30 @@ extension ExecutableFlowSuite {
                 }
             }
 
+            Step("a missing identity fails, signs ad-hoc or skips as .missing says") {
+                let absent = CodeSigning.IdentitySelector.fingerprint(
+                    "0000000000000000000000000000000000000000"
+                )
+                try await Expect.throwsError("fail is the default") {
+                    _ = try await CodeSigning.resolve(
+                        CodeSigning.Configuration(identity: absent)
+                    )
+                }
+                func fallback(_ missing: CodeSigning.MissingIdentity) async throws -> CodeSigning.Signer?? {
+                    guard case .fallback(let signer, _) = try await CodeSigning.resolve(
+                        CodeSigning.Configuration(identity: absent, missing: missing)
+                    ) else { return nil }
+                    return .some(signer)
+                }
+                try Expect.equal(try await fallback(.adHoc), .some(.adHoc), ".ad_hoc signs ad-hoc instead")
+                try Expect.equal(try await fallback(.skip), .some(nil), ".skip leaves the product unsigned")
+                try Expect.equal(
+                    try await CodeSigning.resolve(CodeSigning.Configuration(identity: .adHoc, missing: .fail)),
+                    .sign(.adHoc),
+                    "ad-hoc is never missing"
+                )
+            }
+
             Step("ad hoc signing can sign inspect and verify an executable") {
                 let directory = FileManager.default.temporaryDirectory
                     .appendingPathComponent(
